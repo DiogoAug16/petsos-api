@@ -1,0 +1,169 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+frontend/.expo/
+dist/
+web-build/
+frontend/expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# local env files
+.env*.local
+.env
+
+# typescript
+*.tsbuildinfo
+
+app-example
+
+# generated native folders
+/ios
+/frontend/android
+
+#################################################
+# OS
+#################################################
+.DS_Store
+*.pem
+*.log
+*.stackdump
+
+#################################################
+# Node.js
+#################################################
+.nvm
+npm-debug.log*
+yarn-error.log
+package-lock.json
+
+#################################################
+# Build / Coverage
+#################################################
+build/
+coverage/
+reports/
+*.jsbundle
+
+#################################################
+# IDEs
+#################################################
+
+### VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+
+### JetBrains (IntelliJ / WebStorm / Android Studio)
+.idea/
+*.iml
+*.iws
+out/
+
+### Visual Studio
+.vs
+
+#################################################
+# Android
+#################################################
+.gradle/
+.cxx/
+.externalNativeBuild/
+local.properties
+*.apk
+*.keystore
+!debug.keystore
+captures/
+output.json
+
+#################################################
+# Android Studio
+#################################################
+.project
+.settings
+.classpath
+
+#################################################
+# iOS / Xcode
+#################################################
+DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.hmap
+*.ipa
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.moved-aside
+
+ios/.xcode.env.local
+ios/build/
+
+#################################################
+# CocoaPods
+#################################################
+Pods/
+ios/Pods/
+Podfile.lock
+
+#################################################
+# Ruby / Bundler
+#################################################
+vendor/
+.ruby-version
+/vendor/bundle/
+
+#################################################
+# Fastlane
+#################################################
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots
+**/fastlane/test_output
+
+#################################################
+# Yarn
+#################################################
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+#################################################
+# React Native
+#################################################
+.watchmanconfig
+buck-out/
+.buckd
+
+#################################################
+# Temporary / Misc
+#################################################
+*.hprof
+*.js.meta
