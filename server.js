@@ -1,8 +1,7 @@
+import './src/config/env.js';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import routes from './src/routes/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,10 +9,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Rota teste
-app.get('/', (req, res) => {
-  res.json({ message: 'Backend funcionando!' });
-});
+app.use('/api', routes);
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
