@@ -4,5 +4,6 @@ import * as complaintController from '../modules/complaints/complaints.controlle
 const router = Router();
 
 router.post('/', complaintController.create);
+router.get('/', complaintController.getAll);
 
 export default router;
