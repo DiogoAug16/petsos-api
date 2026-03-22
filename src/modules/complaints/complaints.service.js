@@ -37,3 +37,7 @@ export const create = async ({ title, description, location, type }) => {
 
   return await complaintRepository.create(complaint);
 };
+
+export const getAll = async () => {
+  return await complaintRepository.getAll();
+}
