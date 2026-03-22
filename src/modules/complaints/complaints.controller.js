@@ -9,3 +9,12 @@ export const create = async (req, res) => {
     return error(res, err.message, 400);
   }
 };
+
+export const getAll = async (req, res) => {
+  try {
+    const complaint = await complaintService.getAll();
+    return success(res, complaint, 201);
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+};
