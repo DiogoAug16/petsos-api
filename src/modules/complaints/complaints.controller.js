@@ -18,3 +18,15 @@ export const getAll = async (req, res) => {
     return error(res, err.message, 400);
   }
 };
+
+export const getDetail = async (req, res) => {
+  try {
+    const complaint = await complaintService.getDetail(req.params.id);
+    return success(res, complaint, 200);
+  } catch (err) {
+    if (err.message === "Denúncia não encontrada"){
+      return error(res, err.message, 404);
+    }
+    return error(res, err.message, 400);
+  }
+}

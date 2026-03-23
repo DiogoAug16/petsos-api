@@ -41,3 +41,7 @@ export const create = async ({ title, description, location, type }) => {
 export const getAll = async () => {
   return await complaintRepository.getAll();
 }
+
+export const getDetail = async (id) => {
+  return await complaintRepository.getDetail(id);
+}
