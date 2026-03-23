@@ -25,3 +25,17 @@ export const getAll = async () => {
     };
   });
 }
+
+export const getDetail = async (id) => {
+  const docRef = await db.collection(COLLECTION).doc(id).get();
+  if (!docRef.exists) {
+    throw new Error("Denúncia não encontrada");
+  }
+  const data = docRef.data();
+  return {
+    id: docRef.id,
+    ...data,
+    createdAt: data.createdAt.toDate().toISOString(),
+    updatedAt: data.updatedAt.toDate().toISOString(),
+  };
+}

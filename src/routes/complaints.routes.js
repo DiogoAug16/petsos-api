@@ -5,5 +5,6 @@ const router = Router();
 
 router.post('/', complaintController.create);
 router.get('/', complaintController.getAll);
+router.get('/:id', complaintController.getDetail);
 
 export default router;
