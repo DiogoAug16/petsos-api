@@ -6,5 +6,6 @@ const router = Router();
 router.post('/', complaintController.create);
 router.get('/', complaintController.getAll);
 router.get('/:id', complaintController.getDetail);
+router.delete('/:id', complaintController.deleteComplaint);
 
 export default router;
