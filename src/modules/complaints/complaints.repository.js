@@ -21,10 +21,14 @@ export const getAll = async () => {
       id: doc.id,
       ...data,
       createdAt: data.createdAt.toDate().toISOString(),
-      updatedAt: data.createdAt.toDate().toISOString(),
+      updatedAt: data.updatedAt.toDate().toISOString(),
     };
   });
-}
+};
+
+export const deleteComplaint = async (id) => {
+  await db.collection(COLLECTION).doc(id).delete();
+};
 
 export const getDetail = async (id) => {
   const docRef = await db.collection(COLLECTION).doc(id).get();

@@ -45,3 +45,14 @@ export const getAll = async () => {
 export const getDetail = async (id) => {
   return await complaintRepository.getDetail(id);
 }
+
+export const deleteComplaint = async (id) => {
+  const complaint = await complaintRepository.getDetail(id);
+
+  if (!complaint) {
+    throw new Error('Denúncia não encontrada');
+  }
+
+  await complaintRepository.deleteComplaint(id);
+  return { message: 'Denúncia excluída com sucesso' };
+};
