@@ -21,6 +21,15 @@ export const getDetail = async (req, res) => {
 };
 
 /** @type {import("express").RequestHandler} */
+export const patchComplaint = async (req, res) => {
+  const complaint = await complaintService.patch(
+    req.params.id,
+    req.validatedComplaintData,
+  );
+  return success(res, complaint, 200);
+};
+
+/** @type {import("express").RequestHandler} */
 export const deleteComplaint = async (req, res) => {
   const complaint = await complaintService.deleteComplaint(req.params.id);
   return success(res, complaint, 200);

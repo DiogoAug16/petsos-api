@@ -9,6 +9,7 @@ const router = Router();
 router.post("/", validateUploadImage, prepareComplaintData, wrap(complaintController.create));
 router.get("/", wrap(complaintController.getAll));
 router.get("/:id", wrap(complaintController.getDetail));
+router.patch("/:id", validateUploadImage, prepareComplaintData, wrap(complaintController.patchComplaint));
 router.delete("/:id", wrap(complaintController.deleteComplaint));
 
 export default router;
