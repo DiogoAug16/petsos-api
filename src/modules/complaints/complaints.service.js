@@ -1,8 +1,8 @@
 import * as complaintRepository from "./complaints.repository.js";
 import { COMPLAINT_TYPES } from "../../shared/types/complaintTypes.js";
 import { ValidationError } from "../../shared/errors/validationError.js";
-import { NotFoundError } from "../../shared/errors/notFoundError.js";
 import { ERROR_CODES } from "../../shared/errors/errorCodes.js";
+import { COMPLAINT_ALLOWED_FIELDS } from "../../shared/types/complaintAllowedFields.js";
 
 export const create = async ({ title, description, location, type, photos }) => {
   const missingFields = [];
@@ -18,21 +18,14 @@ export const create = async ({ title, description, location, type, photos }) => 
   if (missingFields.length > 0) {
     throw new ValidationError(
       `Campos obrigatórios faltando: ${missingFields.join(", ")}`,
-      ERROR_CODES.COMPLAINT_VALIDATION
-    );
-  }
-
-  if (missingFields.length > 0) {
-    throw new ValidationError(
-      `Campos obrigatórios faltando: ${missingFields.join(", ")}`,
-      ERROR_CODES.COMPLAINT_VALIDATION
+      ERROR_CODES.COMPLAINT_VALIDATION,
     );
   }
 
   if (!validTypes.includes(type)) {
     throw new ValidationError(
       `Tipo inválido. Valores aceitos: ${validTypes.join(", ")}`,
-      ERROR_CODES.COMPLAINT_VALIDATION
+      ERROR_CODES.COMPLAINT_VALIDATION,
     );
   }
 
@@ -58,13 +51,49 @@ export const getDetail = async (id) => {
   return await complaintRepository.getDetail(id);
 };
 
-export const deleteComplaint = async (id) => {
-  const complaint = await complaintRepository.getDetail(id);
+export const patch = async (id, body) => {
+  const validTypes = Object.values(COMPLAINT_TYPES);
+  const allowedFields = Object.values(COMPLAINT_ALLOWED_FIELDS);
 
-  if (!complaint) {
-    throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+  if (Object.keys(body).length === 0) {
+    throw new ValidationError(
+      "Nenhum campo para atualizar",
+      ERROR_CODES.COMPLAINT_VALIDATION,
+    );
   }
 
+  if (!Object.keys(body).every((field) => allowedFields.includes(field))) {
+    throw new Error(`Existem campos inválidos para atualizar`);
+  }
+
+  if (body.type && !validTypes.includes(body.type)) {
+    throw new ValidationError(
+      "Existem campos inválidos para atualizar",
+      ERROR_CODES.COMPLAINT_VALIDATION,
+    );
+  }
+
+  if (body.location) {
+    if (body.location.latitude === undefined || body.location.longitude === undefined) {
+      throw new ValidationError(
+        "Location deve conter latitude e longitude",
+        ERROR_CODES.COMPLAINT_VALIDATION,
+      );
+    }
+  }
+
+  // verificar depois se o status é valido
+
+  const complaint = {
+    ...body,
+    updatedAt: new Date(),
+  };
+
+  return await complaintRepository.patch(id, complaint);
+};
+
+export const deleteComplaint = async (id) => {
+  await complaintRepository.getDetail(id);
   await complaintRepository.deleteComplaint(id);
   return { message: "Denúncia excluída com sucesso" };
 };
