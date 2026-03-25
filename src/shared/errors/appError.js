@@ -7,7 +7,7 @@ export class AppError extends Error {
 
   getBody() {
     return {
-      sucess: false,
+      success: false,
       message: this.message,
       errorCode: this.errorCode,
     };
