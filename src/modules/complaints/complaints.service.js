@@ -1,5 +1,6 @@
 import * as complaintRepository from './complaints.repository.js';
 import { COMPLAINT_TYPES } from '../../shared/types/complaintTypes.js';
+import { COMPLAINT_ALLOWED_FIELDS } from '../../shared/types/complaintAllowedFields.js';
 
 export const create = async ({ title, description, location, type }) => {
   const missingFields = [];
@@ -16,6 +17,7 @@ export const create = async ({ title, description, location, type }) => {
     throw new Error(`Campos obrigatórios faltando: ${missingFields.join(', ')}`);
   }
 
+  // tá certo estar repetido? (15:17)
   if (missingFields.length > 0) {
     throw new Error(`Campos obrigatórios faltando: ${missingFields.join(', ')}`);
   }
@@ -45,6 +47,38 @@ export const getAll = async () => {
 export const getDetail = async (id) => {
   return await complaintRepository.getDetail(id);
 }
+
+export const patch = async (id, body) => {
+  const validTypes = Object.values(COMPLAINT_TYPES);
+  const allowedFields = Object.values(COMPLAINT_ALLOWED_FIELDS);
+
+  if (Object.keys(body).length === 0) {
+    throw new Error('Nenhum campo para atualizar');
+  }
+
+  if (!Object.keys(body).every(field => allowedFields.includes(field))) {
+    throw new Error(`Existem campos inválidos para atualizar`);
+  }
+
+  if (body.type && !validTypes.includes(body.type)) {
+    throw new Error(`Tipo inválido. Valores aceitos: ${validTypes.join(', ')}`);
+  }
+
+  if (body.location) {
+    if (body.location.latitude === undefined || body.location.longitude === undefined) {
+      throw new Error('Location deve conter latitude e longitude');
+    }
+  }
+
+  // verificar depois se o status é valido
+
+  const complaint = {
+    ...body,
+    updatedAt: new Date(),
+  };
+
+  return await complaintRepository.patch(id, complaint);
+};
 
 export const deleteComplaint = async (id) => {
   const complaint = await complaintRepository.getDetail(id);

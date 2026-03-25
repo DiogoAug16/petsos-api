@@ -7,5 +7,6 @@ router.post('/', complaintController.create);
 router.get('/', complaintController.getAll);
 router.get('/:id', complaintController.getDetail);
 router.delete('/:id', complaintController.deleteComplaint);
+router.patch('/:id', complaintController.patchComplaint);
 
 export default router;

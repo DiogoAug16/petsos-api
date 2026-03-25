@@ -26,10 +26,6 @@ export const getAll = async () => {
   });
 };
 
-export const deleteComplaint = async (id) => {
-  await db.collection(COLLECTION).doc(id).delete();
-};
-
 export const getDetail = async (id) => {
   const docRef = await db.collection(COLLECTION).doc(id).get();
   if (!docRef.exists) {
@@ -43,3 +39,24 @@ export const getDetail = async (id) => {
     updatedAt: data.updatedAt.toDate().toISOString(),
   };
 }
+
+export const patch = async (id, data) => {
+  const docRef = db.collection(COLLECTION).doc(id);
+  const doc = await docRef.get();
+  if (!doc.exists) {
+    throw new Error("Denúncia não encontrada");
+  }
+  await docRef.update(data);
+  const updatedDocRef = (await docRef.get()).data();
+  return {
+    id,
+    ...updatedDocRef,
+    createdAt: updatedDocRef.createdAt.toDate().toISOString(),
+    updatedAt: updatedDocRef.updatedAt.toDate().toISOString(),
+  }
+};
+
+export const deleteComplaint = async (id) => {
+  await db.collection(COLLECTION).doc(id).delete();
+};
+
