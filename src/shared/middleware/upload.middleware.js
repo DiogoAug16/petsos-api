@@ -1,32 +1,30 @@
-import multer from 'multer'
-import path from 'path'
-import fs from 'fs'
+import multer from 'multer';
+import path from 'path';
 
-const uploadDir = 'uploads'
-
-// cria pasta se não existir
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir)
-}
-
+// configuração de armazenamento
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadDir)
+    cb(null, 'uploads/');
   },
   filename: (req, file, cb) => {
-    const fileName = Date.now() + path.extname(file.originalname)
-    cb(null, fileName)
-  },
-})
-
-const fileFilter = (req, file, cb) => {
-  const allowed = ['image/jpeg', 'image/png', 'image/jpg']
-
-  if (allowed.includes(file.mimetype)) {
-    cb(null, true)
-  } else {
-    cb(new Error('Apenas JPG e PNG são permitidos'))
+    const uniqueName = Date.now() + path.extname(file.originalname);
+    cb(null, uniqueName);
   }
-}
+});
 
+// filtro de tipo de arquivo
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/png'];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Apenas imagens JPG e PNG são permitidas'), false);
+  }
+};
+
+export const upload = multer({
+  storage,
+  fileFilter
+});
 export default multer({ storage, fileFilter })
