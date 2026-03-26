@@ -1,12 +1,14 @@
 import * as complaintRepository from "./complaints.repository.js";
-import { COMPLAINT_TYPES } from "../../shared/types/complaintTypes.js";
+import { COMPLAINT_TYPES } from "../../shared/types/complaint.types.js";
+import { COMPLAINT_STATUS } from "./../../shared/types/complaint.status.js";
 import { ValidationError } from "../../shared/errors/validationError.js";
 import { ERROR_CODES } from "../../shared/errors/errorCodes.js";
-import { COMPLAINT_ALLOWED_FIELDS } from "../../shared/types/complaintAllowedFields.js";
+import { COMPLAINT_FIELDS } from "../../shared/types/complaint.fields.js";
 
-export const create = async ({ title, description, location, type, photos }) => {
+export const create = async ({ title, description, location, type, photos, status = STATUS_TYPES.OPEN }) => {
   const missingFields = [];
   const validTypes = Object.values(COMPLAINT_TYPES);
+  const validStatuses = Object.values(COMPLAINT_STATUS);
 
   if (!title) missingFields.push("title");
   if (!description) missingFields.push("description");
@@ -29,12 +31,19 @@ export const create = async ({ title, description, location, type, photos }) => 
     );
   }
 
+  if (!validStatuses.includes(status)) {
+    throw new ValidationError(
+      `Status inválido. Valores aceitos: ${validStatuses.join(", ")}`,
+      ERROR_CODES.COMPLAINT_VALIDATION,
+    );
+  }
+
   const complaint = {
     title,
     description,
     type,
     location,
-    status: "open",
+    status,
     photos: photos || [],
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -53,7 +62,8 @@ export const getDetail = async (id) => {
 
 export const patch = async (id, body) => {
   const validTypes = Object.values(COMPLAINT_TYPES);
-  const allowedFields = Object.values(COMPLAINT_ALLOWED_FIELDS);
+  const validStatuses = Object.values(STATUS_TYPES);
+  const allowedFields = Object.values(COMPLAINT_FIELDS);
 
   if (Object.keys(body).length === 0) {
     throw new ValidationError(
@@ -82,7 +92,12 @@ export const patch = async (id, body) => {
     }
   }
 
-  // verificar depois se o status é valido
+  if (body.status && !validStatuses.includes(body.status)) {
+    throw new ValidationError(
+      `Status inválido. Valores aceitos: ${validStatuses.join(", ")}`,
+      ERROR_CODES.COMPLAINT_VALIDATION,
+    );
+  }
 
   const complaint = {
     ...body,
