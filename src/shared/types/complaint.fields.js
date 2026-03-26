@@ -1,4 +1,4 @@
-export const COMPLAINT_ALLOWED_FIELDS = {
+export const COMPLAINT_FIELDS = {
   TITLE: "title",
   DESCRIPTION: "description",
   TYPE: "type",

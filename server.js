@@ -1,4 +1,5 @@
 import "./src/config/env.js";
+import "./src/config/storage.js";
 import express from "express";
 import cors from "cors";
 import routes from "./src/routes/index.js";
