@@ -5,6 +5,8 @@ import { ValidationError } from "../../shared/errors/validationError.js";
 import { ERROR_CODES } from "../../shared/errors/errorCodes.js";
 import { COMPLAINT_FIELDS } from "../../shared/types/complaint.fields.js";
 import { COMPLAINT_ANIMALS } from "../../shared/types/complaint.animals.js";
+import fs from "fs";
+import path from "path";
 
 export const create = async ({
   title,
@@ -138,8 +140,29 @@ export const patch = async (id, body) => {
   return await complaintRepository.patch(id, complaint);
 };
 
+  // remover denúncia do banco e fotos do disco
 export const deleteComplaint = async (id) => {
-  await complaintRepository.getDetail(id);
+  const complaint = await complaintRepository.getDetail(id);
+
+  if (!complaint) {
+    throw new ValidationError(
+      "Denúncia não encontrada",
+      ERROR_CODES.COMPLAINT_VALIDATION,
+    );
+  }
+
+  // remover fotos do disco
+  if (complaint.photos && complaint.photos.length > 0) {
+    for (const photo of complaint.photos) {
+      const fileName = path.basename(photo);
+      const filePath = path.resolve("uploads", fileName);
+
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+  }
+  // remover do banco
   await complaintRepository.deleteComplaint(id);
   return { message: "Denúncia excluída com sucesso" };
 };
