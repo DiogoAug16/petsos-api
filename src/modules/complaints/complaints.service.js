@@ -4,11 +4,21 @@ import { COMPLAINT_STATUS } from "./../../shared/types/complaint.status.js";
 import { ValidationError } from "../../shared/errors/validationError.js";
 import { ERROR_CODES } from "../../shared/errors/errorCodes.js";
 import { COMPLAINT_FIELDS } from "../../shared/types/complaint.fields.js";
+import { COMPLAINT_ANIMALS } from "../../shared/types/complaint.animals.js";
 
-export const create = async ({ title, description, location, type, photos, status = COMPLAINT_TYPES.OPEN }) => {
+export const create = async ({
+  title,
+  description,
+  location,
+  type,
+  animal,
+  photos,
+  status = COMPLAINT_TYPES.OPEN,
+}) => {
   const missingFields = [];
   const validTypes = Object.values(COMPLAINT_TYPES);
   const validStatuses = Object.values(COMPLAINT_STATUS);
+  const validAnimals = Object.values(COMPLAINT_ANIMALS);
 
   if (!title) missingFields.push("title");
   if (!description) missingFields.push("description");
@@ -16,6 +26,7 @@ export const create = async ({ title, description, location, type, photos, statu
   if (!type) missingFields.push("type");
   if (!location.latitude) missingFields.push("location.latitude");
   if (!location.longitude) missingFields.push("location.longitude");
+  if (!animal) missingFields.push("animal");
 
   if (missingFields.length > 0) {
     throw new ValidationError(
@@ -38,10 +49,18 @@ export const create = async ({ title, description, location, type, photos, statu
     );
   }
 
+  if (animal && !validAnimals.includes(animal)) {
+    throw new ValidationError(
+      `Animal inválido. Valores aceitos: ${validAnimals.join(", ")}`,
+      ERROR_CODES.COMPLAINT_VALIDATION,
+    );
+  }
+
   const complaint = {
     title,
     description,
     type,
+    animal,
     location,
     status,
     photos: photos || [],
@@ -63,7 +82,12 @@ export const getDetail = async (id) => {
 export const patch = async (id, body) => {
   const validTypes = Object.values(COMPLAINT_TYPES);
   const validStatuses = Object.values(COMPLAINT_TYPES);
+  const validAnimals = Object.values(COMPLAINT_ANIMALS);
   const allowedFields = Object.values(COMPLAINT_FIELDS);
+
+  console.log("body recebido:", body);
+  console.log("campos do body:", Object.keys(body));
+  console.log("campos permitidos:", Object.values(COMPLAINT_FIELDS));
 
   if (Object.keys(body).length === 0) {
     throw new ValidationError(
@@ -95,6 +119,13 @@ export const patch = async (id, body) => {
   if (body.status && !validStatuses.includes(body.status)) {
     throw new ValidationError(
       `Status inválido. Valores aceitos: ${validStatuses.join(", ")}`,
+      ERROR_CODES.COMPLAINT_VALIDATION,
+    );
+  }
+
+  if (body.animal && !validAnimals.includes(body.animal)) {
+    throw new ValidationError(
+      `Animal inválido. Valores aceitos: ${validAnimals.join(", ")}`,
       ERROR_CODES.COMPLAINT_VALIDATION,
     );
   }
