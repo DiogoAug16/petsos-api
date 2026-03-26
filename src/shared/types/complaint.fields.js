@@ -1,8 +1,8 @@
 export const COMPLAINT_FIELDS = {
-  TITLE: "title",
-  DESCRIPTION: "description",
-  TYPE: "type",
-  LOCATION: "location",
+  TITLE: "titulo",
+  DESCRIPTION: "descrição",
+  TYPE: "tipo",
+  LOCATION: "localização",
   STATUS: "status",
-  PHOTOS: "photos",
+  PHOTOS: "fotos",
 };
