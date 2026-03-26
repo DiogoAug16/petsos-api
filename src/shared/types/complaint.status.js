@@ -1,5 +1,5 @@
 export const COMPLAINT_STATUS = {
-  OPEN: "aberto",
-  CLOSED: "fechado",
-  RESOLVED: "resolvido",
+  OPEN: "open",
+  CLOSED: "closed",
+  RESOLVED: "resolved",
 };
