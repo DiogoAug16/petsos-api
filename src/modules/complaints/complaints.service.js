@@ -5,7 +5,7 @@ import { ValidationError } from "../../shared/errors/validationError.js";
 import { ERROR_CODES } from "../../shared/errors/errorCodes.js";
 import { COMPLAINT_FIELDS } from "../../shared/types/complaint.fields.js";
 
-export const create = async ({ title, description, location, type, photos, status = STATUS_TYPES.OPEN }) => {
+export const create = async ({ title, description, location, type, photos, status = COMPLAINT_TYPES.OPEN }) => {
   const missingFields = [];
   const validTypes = Object.values(COMPLAINT_TYPES);
   const validStatuses = Object.values(COMPLAINT_STATUS);
@@ -62,7 +62,7 @@ export const getDetail = async (id) => {
 
 export const patch = async (id, body) => {
   const validTypes = Object.values(COMPLAINT_TYPES);
-  const validStatuses = Object.values(STATUS_TYPES);
+  const validStatuses = Object.values(COMPLAINT_TYPES);
   const allowedFields = Object.values(COMPLAINT_FIELDS);
 
   if (Object.keys(body).length === 0) {
