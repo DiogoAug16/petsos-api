@@ -15,12 +15,13 @@ export const create = async ({
   type,
   animal,
   photos,
-  status = COMPLAINT_TYPES.OPEN,
+  status = COMPLAINT_STATUS.OPEN,
 }) => {
   const missingFields = [];
   const validTypes = Object.values(COMPLAINT_TYPES);
   const validStatuses = Object.values(COMPLAINT_STATUS);
   const validAnimals = Object.values(COMPLAINT_ANIMALS);
+  const resolvedStatus = status || COMPLAINT_STATUS.OPEN;
 
   if (!title) missingFields.push("title");
   if (!description) missingFields.push("description");
@@ -44,7 +45,7 @@ export const create = async ({
     );
   }
 
-  if (!validStatuses.includes(status)) {
+  if (!validStatuses.includes(resolvedStatus)) {
     throw new ValidationError(
       `Status inválido. Valores aceitos: ${validStatuses.join(", ")}`,
       ERROR_CODES.COMPLAINT_VALIDATION,
@@ -64,7 +65,7 @@ export const create = async ({
     type,
     animal,
     location,
-    status,
+    status: resolvedStatus,
     photos: photos || [],
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -140,7 +141,7 @@ export const patch = async (id, body) => {
   return await complaintRepository.patch(id, complaint);
 };
 
-  // remover denúncia do banco e fotos do disco
+// remover denúncia do banco e fotos do disco
 export const deleteComplaint = async (id) => {
   const complaint = await complaintRepository.getDetail(id);
 
