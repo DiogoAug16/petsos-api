@@ -15,7 +15,7 @@ export const create = async ({
   type,
   animal,
   photos,
-  status = COMPLAINT_TYPES.OPEN,
+  status = COMPLAINT_STATUS.OPEN,
 }) => {
   const missingFields = [];
   const validTypes = Object.values(COMPLAINT_TYPES);
@@ -140,7 +140,7 @@ export const patch = async (id, body) => {
   return await complaintRepository.patch(id, complaint);
 };
 
-  // remover denúncia do banco e fotos do disco
+// remover denúncia do banco e fotos do disco
 export const deleteComplaint = async (id) => {
   const complaint = await complaintRepository.getDetail(id);
 
