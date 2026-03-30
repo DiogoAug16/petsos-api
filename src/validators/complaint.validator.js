@@ -1,5 +1,5 @@
-import { ValidationError } from "../shared/errors/validationError.js";
-import { ERROR_CODES } from "../shared/errors/errorCodes.js";
+import { ValidationError } from "../shared/errors/validation.error.js";
+import { ERROR_CODES } from "../shared/types/error.codes.js";
 import {
   createComplaintSchema,
   updateComplaintSchema,

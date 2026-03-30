@@ -3,7 +3,7 @@ import "./src/config/storage.js";
 import express from "express";
 import cors from "cors";
 import routes from "./src/routes/index.js";
-import { errorHandler } from "./src/shared/errors/errorHandler.js";
+import { errorHandler } from "./src/shared/middlewares/error.middleware.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;

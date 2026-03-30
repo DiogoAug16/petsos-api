@@ -1,5 +1,5 @@
-import { AppError } from "./appError.js";
-import { InternalServerError } from "./internalServerError.js";
+import { AppError } from "../errors/app.error.js";
+import { InternalServerError } from "../errors/internal-server.error.js";
 
 const normalizeError = (err) => {
   if (err instanceof AppError) return err;

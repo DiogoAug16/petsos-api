@@ -1,8 +1,8 @@
 import { db } from "../../config/firebase.js";
 import { env } from "../../config/env.js";
-import { NotFoundError } from "../../shared/errors/notFoundError.js";
-import { ERROR_CODES } from "../../shared/errors/errorCodes.js";
-import { serialize } from "../../shared/utils/firestoreUtils.js";
+import { NotFoundError } from "../../shared/errors/not-found.error.js";
+import { ERROR_CODES } from "../../shared/types/error.codes.js";
+import { serialize } from "../../shared/utils/firestore.util.js";
 
 const COLLECTION = `${env.firebase.collectionPrefix}complaints`;
 
