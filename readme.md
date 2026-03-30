@@ -14,11 +14,13 @@ backend/
 │   │   ├── complaints/
 │   │   └── users/
 │   ├── routes/
-│   └── shared/
-│       ├── middleware/
-│       ├── utils/
-│       ├── errors/
-│       └── types/
+│   ├── schemas/
+│   ├── shared/
+│   │   ├── middleware/
+│   │   ├── utils/
+│   │   ├── errors/
+│   │   └── types/
+│   └── validators/
 ├── .env.example
 ├── .gitignore
 ├── package.json

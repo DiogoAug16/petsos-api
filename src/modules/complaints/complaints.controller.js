@@ -3,8 +3,7 @@ import { success } from "../../shared/utils/responseUtils.js";
 
 /** @type {import("express").RequestHandler} */
 export const create = async (req, res) => {
-  const complaintData = req.validatedComplaintData;
-  const complaint = await complaintService.create(complaintData);
+  const complaint = await complaintService.create(req.validatedComplaintData);
   return success(res, complaint, 201);
 };
 
