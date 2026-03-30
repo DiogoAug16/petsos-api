@@ -1,5 +1,5 @@
 import * as complaintService from "./complaints.service.js";
-import { success } from "../../shared/utils/responseUtils.js";
+import { success } from "../../shared/utils/response.util.js";
 
 /** @type {import("express").RequestHandler} */
 export const create = async (req, res) => {

@@ -1,6 +1,6 @@
 import * as complaintRepository from "./complaints.repository.js";
 import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
-import { deleteFiles } from "../../shared/helpers/upload.helper.js";
+import { deleteFiles } from "../../shared/helpers/file.helper.js";
 
 export const create = async (complaintData) => {
   const complaint = {

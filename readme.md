@@ -16,15 +16,18 @@ backend/
 │   ├── routes/
 │   ├── schemas/
 │   ├── shared/
-│   │   ├── middleware/
+│   │   ├── helpers/
+│   │   ├── middlewares/
 │   │   ├── utils/
 │   │   ├── errors/
 │   │   └── types/
 │   └── validators/
+│
 ├── .env.example
 ├── .gitignore
 ├── package.json
-└── README.md
+├── README.md
+└── server.js
 ```
 
 ---
@@ -33,14 +36,14 @@ backend/
 
 ### `src/config/`
 
-Centraliza todas as configurações globais da aplicação.
+Centraliza todas as configurações globais de bibliotecas e ambiente.
 
-| Arquivo (exemplo) | Responsabilidade                                      |
-| ----------------- | ----------------------------------------------------- |
-| `firebase.js`     | Inicializa o Firebase Admin SDK (Firestore + Storage) |
-| `env.js`          | Leitura e validação das variáveis de ambiente         |
-
-> ✅ Nenhuma lógica de negócio deve existir aqui — apenas setup e inicialização.
+| Arquivo         | Responsabilidade                             |
+| --------------- | -------------------------------------------- |
+| `firebase.js`   | Inicializa o Firebase Admin SDK (Firestore)  |
+| `storage.js`    | Configuração específica para salvar arquivos |
+| `env.js`        | Leitura das variáveis de ambiente            |
+| `zod.config.js` | Configuração global e customizações do Zod   |
 
 ---
 
@@ -53,17 +56,17 @@ modules/
 └── <nome-do-modulo>/
     ├── <nome>.controller.js   # Recebe a requisição e devolve a resposta HTTP
     ├── <nome>.service.js      # Contém as regras de negócio
-    └── <nome>.repository.js  # Acesso ao banco de dados (queries)
+    └── <nome>.repository.js   # Acesso ao banco de dados
 ```
 
-#### Módulos previstos:
+#### Módulos ativos/previstos:
 
 **`modules/complaints/`** — Denúncias _(Sprint 1 — Alta prioridade)_
 
 - Criar denúncia com descrição e localização
 - Anexar fotos como evidência
-- Editar e excluir denúncia própria
-- Listar e filtrar denúncias no mapa
+- Editar e excluir denúncia
+- Listar todas as denúncias
 
 **`modules/users/`** — Usuários _(Sprint 4)_
 
@@ -79,76 +82,84 @@ Define e agrupa todas as rotas da API, conectando as URLs aos controllers de cad
 ```
 routes/
 ├── index.js               # Ponto central que registra todas as rotas no Express
-├── complaints.routes.js
+├── complaints.routes.js   # Rotas de denúncias com middlewares de validação
 ```
 
-**Convenção de rotas (Exemplos):**
+**Convenção de rotas:**
 
 | Método   | Rota                  | Descrição                |
 | -------- | --------------------- | ------------------------ |
 | `POST`   | `/api/complaints`     | Criar denúncia           |
 | `GET`    | `/api/complaints`     | Listar denúncias         |
 | `GET`    | `/api/complaints/:id` | Detalhes de uma denúncia |
-| `PUT`    | `/api/complaints/:id` | Editar denúncia          |
+| `PATCH`  | `/api/complaints/:id` | Editar denúncia          |
 | `DELETE` | `/api/complaints/:id` | Excluir denúncia         |
 
 ---
 
 ### `src/shared/`
 
-Código reutilizável compartilhado entre todos os módulos. Nada aqui deve conter regras de negócio específicas.
+Código reutilizável compartilhado entre todos os módulos.
 
 ---
 
-#### `src/shared/middleware/`
+#### `src/shared/middlewares/`
 
-Funções intermediárias executadas antes dos controllers nas requisições.
+Funções que interceptam o ciclo de requisição/resposta do Express.
 
-| Arquivo (exemplo)            | Responsabilidade                                   |
-| ---------------------------- | -------------------------------------------------- |
-| `upload.middleware.js`       | Processa o upload de fotos para o Firebase Storage |
-| `validate.middleware.js`     | Valida o corpo da requisição com base em schemas   |
-| `errorHandler.middleware.js` | Captura e formata erros de forma padronizada       |
+| Arquivo                | Responsabilidade                                   |
+| ---------------------- | -------------------------------------------------- |
+| `upload.middleware.js` | Processa o upload de fotos para o disco local      |
+| `error.middleware.js`  | Middleware global para captura e resposta de erros |
+
+---
+
+#### `src/shared/helpers/`
+
+Funções que auxiliam em lógicas específicas de negócio ou operações complexas.
+
+| Arquivo          | Responsabilidade                                          |
+| ---------------- | --------------------------------------------------------- |
+| `file.helper.js` | Auxilia na manipulação de arquivos (ex: deleção de fotos) |
 
 ---
 
 #### `src/shared/utils/`
 
-Funções auxiliares puras e reutilizáveis.
+Abstrações técnicas e funções puras para padronização e reuso de código.
 
-| Arquivo (exemplo)  | Responsabilidade                                                      |
-| ------------------ | --------------------------------------------------------------------- |
-| `geoUtils.js`      | Funções de geolocalização (ex: calcular distância entre pontos)       |
-| `dateUtils.js`     | Formatação e manipulação de datas                                     |
-| `responseUtils.js` | Padroniza o formato de resposta da API (`{ success, data, message }`) |
+| Arquivo                 | Responsabilidade                                                |
+| ----------------------- | --------------------------------------------------------------- |
+| `async-handler.util.js` | Utilitário para capturar erros em controllers assíncronos (HOF) |
+| `firestore.util.js`     | Serialização de dados provenientes do Firestore                 |
+| `response.util.js`      | Padroniza o formato de resposta da API (`{ success, data }`)    |
 
 ---
 
 #### `src/shared/errors/`
 
-Centraliza as classes de erro customizadas da aplicação, tornando o tratamento de erros consistente em todos os módulos.
+Centraliza a definição de exceções customizadas da aplicação.
 
-```js
-// Exemplo de uso
-throw new AppError("Denúncia não encontrada", 404);
-```
-
-| Arquivo (exemplo) | Responsabilidade                                             |
-| ----------------- | ------------------------------------------------------------ |
-| `AppError.js`     | Classe base de erro com statusCode e mensagem                |
-| `httpErrors.js`   | Erros HTTP semânticos prontos (NotFound, Unauthorized, etc.) |
+| Arquivo                    | Responsabilidade                                    |
+| -------------------------- | --------------------------------------------------- |
+| `app.error.js`             | Classe base para erros operacionais                 |
+| `error.codes.js`           | Dicionário de códigos de erro para o frontend       |
+| `not_found.error.js`       | Erro específico para recursos não encontrados (404) |
+| `validation.error.js`      | Erro formatado para falhas de validação (400)       |
+| `internal_server.error.js` | Erro genérico para falhas inesperadas (500)         |
 
 ---
 
 #### `src/shared/types/`
 
-Constantes e enums usados em toda a aplicação, evitando strings mágicas espalhadas pelo código.
+Enums, constantes e códigos de erros que evitam o uso de "strings mágicas".
 
-```js
-// Exemplo
-const COMPLAINT_STATUS = { OPEN: "open", RESOLVED: "resolved", CLOSED: "closed" };
-const USER_ROLES = { CITIZEN: "citizen", ONG: "ong", ADMIN: "admin" };
-```
+| Arquivo                | Conteúdo                                            |
+| ---------------------- | --------------------------------------------------- |
+| `complaint.status.js`  | Status: `aberto`, `fechado`, `resolvido`            |
+| `complaint.animals.js` | Tipos de animais: `cachorro`, `gato`, `passaro` etc |
+| `complaint.types.js`   | Tipos de denúncia: `abandono`, `violencia` etc      |
+| `error.codes.js`       | Dicionário de códigos de erro para o frontend       |
 
 ---
 
@@ -181,27 +192,28 @@ FIREBASE_PROJECT_ID=
 FIREBASE_PRIVATE_KEY=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_STORAGE_BUCKET=
+FIREBASE_COLLECTION_PREFIX=
 ```
 
 ---
 
 ## 📦 Dependências principais
 
-| Pacote           | Uso                                                            |
-| ---------------- | -------------------------------------------------------------- |
-| `express`        | Framework HTTP                                                 |
-| `dotenv`         | Leitura de variáveis de ambiente                               |
-| `firebase-admin` | Acesso ao Firestore (banco) e Storage (fotos)                  |
-| `multer`         | Processa o upload de fotos antes de enviar ao Firebase Storage |
-| `zod` / `joi`    | Validação de dados das requisições                             |
+| Pacote           | Uso                                 |
+| ---------------- | ----------------------------------- |
+| `express`        | Framework HTTP                      |
+| `dotenv`         | Leitura de variáveis de ambiente    |
+| `firebase-admin` | Acesso ao Firestore (banco)         |
+| `multer`         | Processamento de upload de arquivos |
+| `zod`            | Validação de schemas e tipos        |
 
 ---
 
-## 🗺️ Roadmap por Sprint
+## 🗺️ Roadmap por Sprint (BACKEND)
 
-| Sprint   | Módulos envolvidos                                     | Status     |
-| -------- | ------------------------------------------------------ | ---------- |
-| Sprint 1 | `complaints` (CRUD + geolocalização + upload de fotos) | 🔲 Backlog |
-| Sprint 2 | `complaints` (filtros + mapa) + `collaborations`       | 🔲 Backlog |
-| Sprint 3 | `complaints` (status + histórico) + `validations`      | 🔲 Backlog |
-| Sprint 4 | `users` (auth completa)                                | 🔲 Backlog |
+| Sprint   | Módulos envolvidos                                     | Status       |
+| -------- | ------------------------------------------------------ | ------------ |
+| Sprint 1 | `complaints` (CRUD + geolocalização + upload de fotos) | ✅ Concluído |
+| Sprint 2 | `complaints` (filtros + mapa) + `collaborations`       | 🔲 Backlog   |
+| Sprint 3 | `complaints` (status + histórico) + `validations`      | 🔲 Backlog   |
+| Sprint 4 | `users` (auth completa)                                | 🔲 Backlog   |

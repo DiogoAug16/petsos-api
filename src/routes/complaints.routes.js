@@ -1,6 +1,6 @@
 import { Router } from "express";
 import * as complaintController from "../modules/complaints/complaints.controller.js";
-import { wrap } from "../shared/utils/controllerHOF.js";
+import { wrap } from "../shared/utils/async-handler.util.js";
 import { validateUploadImage } from "../validators/upload.validator.js";
 import { validateCreateComplaint, validateUpdateComplaint } from "../validators/complaint.validator.js";
 

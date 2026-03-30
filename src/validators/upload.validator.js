@@ -1,6 +1,6 @@
-import { upload } from "../shared/middleware/upload.middleware.js";
-import { ValidationError } from "../shared/errors/validationError.js";
-import { ERROR_CODES } from "../shared/errors/errorCodes.js";
+import { upload } from "../shared/middlewares/upload.middleware.js";
+import { ValidationError } from "../shared/errors/validation.error.js";
+import { ERROR_CODES } from "../shared/types/error.codes.js";
 
 export const validateUploadImage = (req, res, next) => {
   upload.single("photos")(req, res, (err) => {
