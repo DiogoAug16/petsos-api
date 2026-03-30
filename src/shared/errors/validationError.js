@@ -2,7 +2,20 @@ import { AppError } from "./appError.js";
 import { ERROR_CODES } from "./errorCodes.js";
 
 export class ValidationError extends AppError {
-  constructor(message = "Dados de entrada inválidos", code = ERROR_CODES.VALIDATION) {
+  constructor(
+    errors,
+    code = ERROR_CODES.VALIDATION,
+    message = "Dados de entrada inválidos",
+  ) {
     super(message, 400, code);
+    this.errors =
+      typeof errors === "string" ? { formErrors: [errors], fieldErrors: {} } : errors;
+  }
+
+  getBody() {
+    return {
+      ...super.getBody(),
+      errors: this.errors.fieldErrors,
+    };
   }
 }
