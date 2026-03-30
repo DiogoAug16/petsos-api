@@ -4,3 +4,5 @@ export const COMPLAINT_ANIMALS = {
   BIRD: "passaro",
   OTHER: "outro",
 };
+
+export const VALID_COMPLAINT_ANIMALS = Object.values(COMPLAINT_ANIMALS);

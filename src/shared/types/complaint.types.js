@@ -5,3 +5,5 @@ export const COMPLAINT_TYPES = {
   HOARDING: "acumulo de animais",
   OTHER: "outro",
 };
+
+export const VALID_COMPLAINT_TYPES = Object.values(COMPLAINT_TYPES);
