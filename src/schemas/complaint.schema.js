@@ -8,7 +8,7 @@ const locationSchema = z.object({
   longitude: z.number().min(-180).max(180),
 });
 
-export const createComplaintSchema = z.object({
+const complaintBaseSchema = z.object({
   title: z.string().trim().min(3),
   description: z.string().trim().optional(),
   type: z.enum(VALID_COMPLAINT_TYPES),
@@ -17,7 +17,15 @@ export const createComplaintSchema = z.object({
   photos: z.array(z.string()).optional(),
 });
 
-export const updateComplaintSchema = createComplaintSchema
+export const createComplaintSchema = complaintBaseSchema.refine(
+  (data) => data.description || (data.photos && data.photos.length > 0),
+  {
+    message: "A denúncia deve ter pelo menos uma descrição ou uma foto.",
+    path: ["_root"],
+  },
+);
+
+export const updateComplaintSchema = complaintBaseSchema
   .partial()
   .extend({
     status: z.enum(VALID_COMPLAINT_STATUS).optional(),
