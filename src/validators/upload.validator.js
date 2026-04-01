@@ -3,7 +3,7 @@ import { ValidationError } from "../shared/errors/validation.error.js";
 import { ERROR_CODES } from "../shared/types/error.codes.js";
 
 export const validateUploadImage = (req, res, next) => {
-  upload.single("photos")(req, res, (err) => {
+  upload.array("photos", 5)(req, res, (err) => {
     if (err) {
       return next(
         new ValidationError("Erro ao fazer upload da imagem", ERROR_CODES.UPLOAD_ERROR),
