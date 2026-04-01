@@ -41,9 +41,11 @@ const prepareData = (req) => {
   if (body.location) {
     data.location = parseLocation(body.location);
   }
-
-  if (req.file) {
-    data.photos = [`/uploads/${req.file.filename}`];
+  // Alteração para multiplas fotos
+  if (req.files && req.files.length > 0) {
+    data.photos = req.files.map((file) => `/uploads/${file.filename}`);
+  } else {
+    data.photos = [];
   }
 
   return data;
