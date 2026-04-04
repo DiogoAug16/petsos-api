@@ -52,10 +52,17 @@ const prepareData = (req) => {
 };
 
 const parseLocation = (location) => {
-  if (typeof location !== "string" || !location.trim()) return location;
   try {
-    return JSON.parse(location);
+    const parsed = typeof location === "string" ? JSON.parse(location) : location;
+
+    const { latitude, longitude } = parsed || {};
+
+    if (typeof latitude !== "number" || typeof longitude !== "number") {
+      throw new Error();
+    }
+
+    return { latitude, longitude };
   } catch {
-    throw new ValidationError("Location inválido", ERROR_CODES.COMPLAINT_VALIDATION);
+    throw new ValidationError("Localização inválida", ERROR_CODES.COMPLAINT_VALIDATION);
   }
 };
