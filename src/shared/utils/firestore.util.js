@@ -6,6 +6,7 @@ const transformValue = (value) => {
     return { latitude: value.latitude, longitude: value.longitude };
   return value;
 };
+
 export const serialize = (id, data) => ({
   id,
   ...Object.fromEntries(
