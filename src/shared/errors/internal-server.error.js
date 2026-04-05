@@ -1,15 +1,17 @@
 import { AppError } from "./app.error.js";
 import { ERROR_CODES } from "../types/error.codes.js";
+import logger from "../../logger/index.js";
 
 export class InternalServerError extends AppError {
   constructor(err) {
     super("Erro interno do servidor", 500, ERROR_CODES.INTERNAL);
 
-    // adicionar um logger depois
-    console.log({
-      message: err.message,
-      stackTrace: err.stack,
-      level: "fatal",
-    });
+    logger.fatal(
+      {
+        message: err.message,
+        stack: err.stack,
+      },
+      "Erro interno não tratado",
+    );
   }
 }

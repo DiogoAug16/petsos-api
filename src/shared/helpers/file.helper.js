@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import logger from "../../logger/index.js";
 
 export const deleteFiles = (filePaths = []) => {
   for (const filePath of filePaths) {
@@ -8,6 +9,9 @@ export const deleteFiles = (filePaths = []) => {
 
     if (fs.existsSync(fullPath)) {
       fs.unlinkSync(fullPath);
+      logger.debug({ file: fileName }, "Arquivo deletado");
+    } else {
+      logger.warn({ file: fileName }, "Arquivo não encontrado ao tentar deletar");
     }
   }
 };
