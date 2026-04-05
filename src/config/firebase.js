@@ -10,3 +10,4 @@ admin.initializeApp({
 });
 
 export const db = admin.firestore();
+export const GeoPoint = admin.firestore.GeoPoint;
