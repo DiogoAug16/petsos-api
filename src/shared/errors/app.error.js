@@ -1,5 +1,7 @@
+import { StatusCodes } from "http-status-codes";
+
 export class AppError extends Error {
-  constructor(message, statusCode = 500, errorCode) {
+  constructor(message, statusCode = StatusCodes.INTERNAL_SERVER_ERROR, errorCode) {
     super(message);
     this.statusCode = statusCode;
     this.errorCode = errorCode;
