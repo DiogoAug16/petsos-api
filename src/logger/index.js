@@ -30,6 +30,13 @@ const targets = [
       destination: "src/logger/logs/fatal.log",
     },
   },
+  {
+    target: "pino/file",
+    level: "warn",
+    options: {
+      destination: "src/logger/logs/warn.log",
+    },
+  },
 ];
 
 if (env.isDev) {
