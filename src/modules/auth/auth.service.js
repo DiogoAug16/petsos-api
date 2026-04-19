@@ -1,6 +1,11 @@
 import admin from "firebase-admin";
-import { AppError } from "../../shared/errors/app.error.js";
-import { StatusCodes } from "http-status-codes";
+import {
+  EmailAlreadyInUseError,
+  UsernameAlreadyExistsError,
+  WeakPasswordError,
+  InvalidEmailError,
+  RegistrationFailedError,
+} from "../../shared/errors/auth.error.js";
 import * as authRepository from "./auth.repository.js";
 import logger from "../../logger/index.js";
 
@@ -9,11 +14,7 @@ export async function register(userData) {
 
   const usernameExists = await authRepository.checkUsernameExists(username);
   if (usernameExists) {
-    throw new AppError(
-      "Este username já está em uso",
-      StatusCodes.CONFLICT,
-      "USERNAME_ALREADY_EXISTS",
-    );
+    throw new UsernameAlreadyExistsError();
   }
 
   try {
@@ -45,26 +46,18 @@ export async function register(userData) {
     logger.error({ error: error.message }, "Erro ao criar usuário");
 
     if (error.code === "auth/email-already-exists") {
-      throw new AppError(
-        "Este email já está cadastrado",
-        StatusCodes.CONFLICT,
-        "EMAIL_ALREADY_IN_USE",
-      );
+      throw new EmailAlreadyInUseError();
     }
 
     if (error.code === "auth/invalid-email") {
-      throw new AppError("Email inválido", StatusCodes.BAD_REQUEST, "INVALID_EMAIL");
+      throw new InvalidEmailError();
     }
 
     if (error.code === "auth/weak-password") {
-      throw new AppError("Senha muito fraca", StatusCodes.BAD_REQUEST, "WEAK_PASSWORD");
+      throw new WeakPasswordError();
     }
 
-    throw new AppError(
-      "Erro ao criar conta",
-      StatusCodes.INTERNAL_SERVER_ERROR,
-      "REGISTRATION_FAILED",
-    );
+    throw new RegistrationFailedError();
   }
 }
 
