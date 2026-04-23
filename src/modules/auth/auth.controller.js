@@ -3,8 +3,9 @@ import { success } from "../../shared/utils/response.util.js";
 import { StatusCodes } from "http-status-codes";
 
 /** @type {import("express").RequestHandler} */
-export const register = async (req, res) => {
-  const user = await authService.register(req.validatedAuthData);
+export const completeProfile = async (req, res) => {
+  const idToken = req.headers.authorization?.replace("Bearer ", "");
+  const user = await authService.completeProfile(idToken, req.validatedAuthData);
   return success(res, user, StatusCodes.CREATED);
 };
 

@@ -1,64 +1,56 @@
 import admin from "firebase-admin";
 import {
-  EmailAlreadyInUseError,
   UsernameAlreadyExistsError,
-  WeakPasswordError,
-  InvalidEmailError,
-  RegistrationFailedError,
+  UnauthorizedError,
 } from "../../shared/errors/auth.error.js";
 import * as authRepository from "./auth.repository.js";
 import logger from "../../logger/index.js";
 
-export async function register(userData) {
-  const { email, password, name, username } = userData;
+export async function completeProfile(idToken, profileData) {
+  const { name, username } = profileData;
+
+  let decodedToken;
+  try {
+    decodedToken = await admin.auth().verifyIdToken(idToken);
+  } catch (error) {
+    logger.error({ error: error.message }, "Token inválido");
+    throw new UnauthorizedError();
+  }
+
+  const uid = decodedToken.uid;
+
+  const existingUser = await authRepository.getUserDocument(uid);
+  if (existingUser) {
+    logger.info({ uid }, "Perfil já existe, retornando dados");
+    return {
+      uid,
+      email: existingUser.email,
+      displayName: existingUser.name,
+    };
+  }
 
   const usernameExists = await authRepository.checkUsernameExists(username);
   if (usernameExists) {
     throw new UsernameAlreadyExistsError();
   }
 
-  try {
-    const userRecord = await admin.auth().createUser({
-      email,
-      password,
-      displayName: name,
-    });
+  const userRecord = await admin.auth().getUser(uid);
 
-    await authRepository.createUserDocument(userRecord.uid, {
-      email,
-      name,
-      username,
-    });
+  await authRepository.createUserDocument(uid, {
+    email: userRecord.email,
+    name,
+    username,
+  });
 
-    await authRepository.createUsernameDocument(username, userRecord.uid, email);
+  await authRepository.createUsernameDocument(username, uid, userRecord.email);
 
-    const customToken = await admin.auth().createCustomToken(userRecord.uid);
+  logger.info({ uid, email: userRecord.email }, "Perfil completado com sucesso");
 
-    logger.info({ uid: userRecord.uid, email }, "Usuário criado com sucesso");
-
-    return {
-      uid: userRecord.uid,
-      email: userRecord.email,
-      displayName: userRecord.displayName,
-      customToken,
-    };
-  } catch (error) {
-    logger.error({ error: error.message }, "Erro ao criar usuário");
-
-    if (error.code === "auth/email-already-exists") {
-      throw new EmailAlreadyInUseError();
-    }
-
-    if (error.code === "auth/invalid-email") {
-      throw new InvalidEmailError();
-    }
-
-    if (error.code === "auth/weak-password") {
-      throw new WeakPasswordError();
-    }
-
-    throw new RegistrationFailedError();
-  }
+  return {
+    uid,
+    email: userRecord.email,
+    displayName: name,
+  };
 }
 
 export async function checkUsername(username) {

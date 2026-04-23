@@ -5,7 +5,11 @@ import { wrap } from "../shared/utils/async-handler.util.js";
 
 const router = Router();
 
-router.post("/register", authValidator.validateRegister, wrap(authController.register));
+router.post(
+  "/complete-profile",
+  authValidator.validateCompleteProfile,
+  wrap(authController.completeProfile),
+);
 
 router.get(
   "/check-username/:username",
