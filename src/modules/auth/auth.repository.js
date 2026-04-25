@@ -23,6 +23,11 @@ export async function createUserDocument(uid, userData) {
   });
 }
 
+export async function getEmailByUsername(username) {
+  const doc = await db.collection(USERNAMES_COLLECTION).doc(username.toLowerCase()).get();
+  return doc.exists ? doc.data().email : null;
+}
+
 export async function createUsernameDocument(username, uid, email) {
   await db.collection(USERNAMES_COLLECTION).doc(username.toLowerCase()).set({
     email,

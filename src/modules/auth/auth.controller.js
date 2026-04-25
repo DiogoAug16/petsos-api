@@ -10,6 +10,12 @@ export const completeProfile = async (req, res) => {
 };
 
 /** @type {import("express").RequestHandler} */
+export const resolveUsername = async (req, res) => {
+  const result = await authService.resolveUsername(req.params.username);
+  return success(res, result, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
 export const checkUsername = async (req, res) => {
   const result = await authService.checkUsername(req.params.username);
   return success(res, result, StatusCodes.OK);

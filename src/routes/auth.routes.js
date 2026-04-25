@@ -10,11 +10,15 @@ router.post(
   authValidator.validateCompleteProfile,
   wrap(authController.completeProfile),
 );
-
 router.get(
   "/check-username/:username",
   authValidator.validateCheckUsername,
   wrap(authController.checkUsername),
+);
+router.get(
+  "/resolve-username/:username",
+  authValidator.validateCheckUsername,
+  wrap(authController.resolveUsername),
 );
 
 export default router;

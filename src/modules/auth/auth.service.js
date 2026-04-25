@@ -53,6 +53,11 @@ export async function completeProfile(idToken, profileData) {
   };
 }
 
+export async function resolveUsername(username) {
+  const email = await authRepository.getEmailByUsername(username);
+  return { email };
+}
+
 export async function checkUsername(username) {
   const exists = await authRepository.checkUsernameExists(username);
   return { available: !exists };
