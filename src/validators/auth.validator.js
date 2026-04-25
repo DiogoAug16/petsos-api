@@ -1,7 +1,7 @@
-import { registerSchema, checkUsernameSchema } from "../schemas/auth.schema.js";
+import { completeProfileSchema, checkUsernameSchema } from "../schemas/auth.schema.js";
 
-export const validateRegister = (req, res, next) => {
-  const result = registerSchema.safeParse({ body: req.body });
+export const validateCompleteProfile = (req, res, next) => {
+  const result = completeProfileSchema.safeParse({ body: req.body });
 
   if (!result.success) {
     return res.status(400).json({

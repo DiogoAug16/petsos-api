@@ -43,3 +43,13 @@ export class RegistrationFailedError extends AppError {
     );
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor() {
+    super(
+      "Token inválido ou expirado",
+      StatusCodes.UNAUTHORIZED,
+      ERROR_CODES.UNAUTHORIZED,
+    );
+  }
+}

@@ -9,6 +9,11 @@ export async function checkUsernameExists(username) {
   return doc.exists;
 }
 
+export async function getUserDocument(uid) {
+  const doc = await db.collection(USERS_COLLECTION).doc(uid).get();
+  return doc.exists ? doc.data() : null;
+}
+
 export async function createUserDocument(uid, userData) {
   await db.collection(USERS_COLLECTION).doc(uid).set({
     email: userData.email,
@@ -16,6 +21,11 @@ export async function createUserDocument(uid, userData) {
     username: userData.username.toLowerCase(),
     createdAt: new Date().toISOString(),
   });
+}
+
+export async function getEmailByUsername(username) {
+  const doc = await db.collection(USERNAMES_COLLECTION).doc(username.toLowerCase()).get();
+  return doc.exists ? doc.data().email : null;
 }
 
 export async function createUsernameDocument(username, uid, email) {
