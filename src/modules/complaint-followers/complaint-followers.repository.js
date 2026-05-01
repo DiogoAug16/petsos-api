@@ -1,6 +1,7 @@
 import { db } from "../../config/firebase.js";
 import { env } from "../../config/env.js";
 import { serialize } from "../../shared/utils/firestore.util.js";
+import { ConflictError } from "../../shared/errors/conflict.error.js";
 
 const COLLECTION = `${env.firebase.collectionPrefix}complaint_followers`;
 
@@ -13,7 +14,7 @@ export const create = async ({ complaintId, userId, createdAt }) => {
   const doc = await docRef.get();
 
   if (doc.exists) {
-    return serialize(doc.id, doc.data());
+    throw new ConflictError("Usuário já acompanha esta denúncia");
   }
 
   const data = {
