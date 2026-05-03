@@ -1,13 +1,12 @@
 import { db } from "../../config/firebase.js";
 import { env } from "../../config/env.js";
-import { serialize } from "../../shared/utils/firestore.util.js";
 import { ConflictError } from "../../shared/errors/conflict.error.js";
 
 const COLLECTION = `${env.firebase.collectionPrefix}complaint_followers`;
 
 const makeDocId = (complaintId, userId) => `${complaintId}_${userId}`;
 
-export const create = async ({ complaintId, userId, createdAt }) => {
+export const follow = async (complaintId, userId) => {
   const docId = makeDocId(complaintId, userId);
   const docRef = db.collection(COLLECTION).doc(docId);
 
@@ -17,20 +16,33 @@ export const create = async ({ complaintId, userId, createdAt }) => {
     throw new ConflictError("Usuário já acompanha esta denúncia");
   }
 
-  const data = {
+  await docRef.set({
     complaintId,
     userId,
-    createdAt,
-  };
-
-  await docRef.set(data);
-
-  return serialize(docId, data);
+    createdAt: new Date(),
+  });
 };
 
-export const remove = async ({ complaintId, userId }) => {
+export const unfollow = async (complaintId, userId) => {
   const docId = makeDocId(complaintId, userId);
+
   await db.collection(COLLECTION).doc(docId).delete();
+};
+
+export const getFollowers = async (complaintId) => {
+  const snapshot = await db
+    .collection(COLLECTION)
+    .where("complaintId", "==", complaintId)
+    .get();
+
+  return snapshot.docs.map((doc) => doc.data().userId);
+};
+
+export const isFollowing = async (complaintId, userId) => {
+  const docId = makeDocId(complaintId, userId);
+  const doc = await db.collection(COLLECTION).doc(docId).get();
+
+  return doc.exists;
 };
 
 export const countByComplaintId = async (complaintId) => {
@@ -40,13 +52,4 @@ export const countByComplaintId = async (complaintId) => {
     .get();
 
   return snapshot.size;
-};
-
-export const findByComplaintId = async (complaintId) => {
-  const snapshot = await db
-    .collection(COLLECTION)
-    .where("complaintId", "==", complaintId)
-    .get();
-
-  return snapshot.docs.map((doc) => serialize(doc.id, doc.data()));
 };
