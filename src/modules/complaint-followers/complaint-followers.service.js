@@ -1,15 +1,15 @@
 import * as complaintFollowersRepository from "./complaint-followers.repository.js";
 
 export const follow = async ({ complaintId, userId }) => {
-  return await complaintFollowersRepository.create({
-    complaintId,
-    userId,
-    createdAt: new Date(),
-  });
+  await complaintFollowersRepository.follow(complaintId, userId);
+
+  return {
+    message: "Denúncia adicionada aos acompanhamentos com sucesso",
+  };
 };
 
 export const unfollow = async ({ complaintId, userId }) => {
-  await complaintFollowersRepository.remove({ complaintId, userId });
+  await complaintFollowersRepository.unfollow(complaintId, userId);
 
   return {
     message: "Denúncia removida dos acompanhamentos com sucesso",
@@ -26,5 +26,14 @@ export const count = async (complaintId) => {
 };
 
 export const listByComplaint = async (complaintId) => {
-  return await complaintFollowersRepository.findByComplaintId(complaintId);
+  return await complaintFollowersRepository.getFollowers(complaintId);
+};
+
+export const isFollowing = async ({ complaintId, userId }) => {
+  const following = await complaintFollowersRepository.isFollowing(complaintId, userId);
+
+  return {
+    complaintId,
+    isFollowing: following,
+  };
 };
