@@ -47,3 +47,13 @@ export const getNearest = async (req, res) => {
 
   return success(res, complaints, 200);
 };
+
+/** @type {import("express").RequestHandler} */
+export const assumeComplaint = async (req, res) => {
+  const complaint = await complaintService.assumeComplaint({
+    complaintId: req.params.id,
+    userId: req.userId,
+  });
+
+  return success(res, complaint, StatusCodes.CREATED);
+};

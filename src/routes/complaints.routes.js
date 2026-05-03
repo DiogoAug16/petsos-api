@@ -3,6 +3,7 @@ import * as complaintController from "../modules/complaints/complaints.controlle
 import { wrap } from "../shared/utils/async-handler.util.js";
 import { validateUploadImage } from "../validators/upload.validator.js";
 import { validateCreateComplaint, validateUpdateComplaint } from "../validators/complaint.validator.js";
+import { authenticateToken } from "../shared/middlewares/auth.middleware.js";
 
 const router = Router();
 
@@ -12,5 +13,8 @@ router.get("/nearest", wrap(complaintController.getNearest));
 router.get("/:id", wrap(complaintController.getDetail));
 router.patch("/:id", validateUploadImage, validateUpdateComplaint, wrap(complaintController.patchComplaint));
 router.delete("/:id", wrap(complaintController.deleteComplaint));
+router.post( "/:id/assumir", authenticateToken, wrap(complaintController.assumeComplaint)
+);
+
 
 export default router;
