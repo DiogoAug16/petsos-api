@@ -3,6 +3,7 @@ import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
 import { deleteFiles } from "../../shared/helpers/file.helper.js";
 import { ValidationError } from "../../shared/errors/validation.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
+import * as complaintFollowersRepository from "../complaint-followers/complaint-followers.repository.js";
 
 export const create = async (complaintData) => {
   const complaint = {
@@ -66,4 +67,12 @@ export const findNearestWithinRadius = async ({ lat, lng, radiusKm }) => {
     parsedLng,
     parsedRadiusKm,
   );
+};
+
+export const assumeComplaint = async ({ complaintId, userId }) => {
+  await complaintFollowersRepository.follow(complaintId, userId);
+
+  return {
+    message: "Denúncia assumida com sucesso",
+  };
 };
