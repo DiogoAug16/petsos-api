@@ -1,4 +1,7 @@
 import { completeProfileSchema, checkUsernameSchema } from "../schemas/auth.schema.js";
+import { ValidationError } from "../shared/errors/validation.error.js";
+import { ERROR_CODES } from "../shared/types/error.codes.js";
+import { z } from "zod";
 
 export const validateCompleteProfile = (req, res, next) => {
   const result = completeProfileSchema.safeParse({ body: req.body });
@@ -28,5 +31,17 @@ export const validateCheckUsername = (req, res, next) => {
     });
   }
 
+  next();
+};
+
+export const validateUsernameParam = (req, res, next) => {
+  const result = checkUsernameSchema.safeParse({ params: req.params });
+
+  if (!result.success) {
+    const errors = z.flattenError(result.error);
+    throw new ValidationError(errors, ERROR_CODES.VALIDATION);
+  }
+
+  req.validatedParams = result.data.params;
   next();
 };

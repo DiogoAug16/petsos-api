@@ -1,0 +1,33 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "dev_complaint_followers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "dev_complaint_followers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "complaintId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
