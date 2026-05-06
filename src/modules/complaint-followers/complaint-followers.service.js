@@ -1,4 +1,5 @@
 import * as complaintFollowersRepository from "./complaint-followers.repository.js";
+import * as usersRepository from "../users/users.repository.js";
 
 export const follow = async ({ complaintId, userId }) => {
   await complaintFollowersRepository.follow(complaintId, userId);
@@ -26,7 +27,10 @@ export const count = async (complaintId) => {
 };
 
 export const listByComplaint = async (complaintId) => {
-  return await complaintFollowersRepository.getFollowers(complaintId);
+  const followerUserIds = await complaintFollowersRepository.getFollowers(complaintId);
+  const usersById = await usersRepository.getUsersByIds(followerUserIds);
+
+  return followerUserIds.map((userId) => usersById.get(userId)).filter(Boolean);
 };
 
 export const isFollowing = async ({ complaintId, userId }) => {
