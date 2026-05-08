@@ -51,3 +51,9 @@ export const createTestNotification = async (req, res) => {
 
   return success(res, notification, StatusCodes.CREATED);
 };
+
+export const countUnread = async (req, res) => {
+  const result = await notificationsService.countUnread(req.userId);
+
+  return success(res, result);
+};

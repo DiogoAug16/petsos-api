@@ -6,7 +6,6 @@ import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
 
 const COLLECTION = `${env.firebase.collectionPrefix}notifications`;
-const USERS_COLLECTION = `${env.firebase.collectionPrefix}users`;
 
 /**
  * Cria uma nova notificação no Firestore.
@@ -32,9 +31,10 @@ export const create = async ({ userId, complaintId, type, message }) => {
 };
 
 /**
- * Busca notificações do usuário autenticado.
+ * Busca notificações do usuário autenticado,
+ * ordenadas da mais recente para a mais antiga.
  */
-export const findByUserId = async (userId) => {
+export const getUserNotifications = async (userId) => {
   const snapshot = await db
     .collection(COLLECTION)
     .where("userId", "==", userId)
@@ -46,6 +46,11 @@ export const findByUserId = async (userId) => {
     ...doc.data(),
   }));
 };
+
+/**
+ * Alias temporário para manter compatibilidade com código antigo.
+ */
+export const findByUserId = getUserNotifications;
 
 /**
  * Marca uma notificação como lida.
@@ -72,14 +77,54 @@ export const markAsRead = async (notificationId, userId) => {
 };
 
 /**
- * Salva o push token do usuário.
+ * Retorna a quantidade de notificações não lidas do usuário.
  */
-export const savePushToken = async ({ userId, pushToken }) => {
-  await db.collection(USERS_COLLECTION).doc(userId).set(
-    {
-      pushToken,
-      pushTokenUpdatedAt: new Date(),
-    },
-    { merge: true },
-  );
+export const countUnread = async (userId) => {
+  const snapshot = await db
+    .collection(COLLECTION)
+    .where("userId", "==", userId)
+    .where("read", "==", false)
+    .get();
+
+  return snapshot.size;
+};
+
+/**
+ * Busca notificações não lidas e não agrupadas
+ * criadas nos últimos 15 minutos para agrupamento.
+ */
+export const getPendingGroupable = async (userId, complaintId, type) => {
+  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+
+  const snapshot = await db
+    .collection(COLLECTION)
+    .where("userId", "==", userId)
+    .where("complaintId", "==", complaintId)
+    .where("type", "==", type)
+    .where("read", "==", false)
+    .where("grouped", "==", false)
+    .where("createdAt", ">=", fifteenMinutesAgo)
+    .get();
+
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+};
+
+/**
+ * Marca notificações como agrupadas utilizando batch update.
+ */
+export const markAsGrouped = async (notificationIds) => {
+  const batch = db.batch();
+
+  notificationIds.forEach((id) => {
+    const ref = db.collection(COLLECTION).doc(id);
+
+    batch.update(ref, {
+      grouped: true,
+    });
+  });
+
+  await batch.commit();
 };

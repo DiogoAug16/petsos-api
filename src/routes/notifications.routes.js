@@ -19,6 +19,12 @@ const router = Router();
 router.get("/", authenticateToken, wrap(notificationsController.getUserNotifications));
 
 /**
+ * Retorna a quantidade de notificações não lidas
+ * do usuário autenticado.
+ */
+router.get("/unread-count", authenticateToken, notificationsController.countUnread);
+
+/**
  * PATCH /notifications/:id/read
  * Marca uma notificação como lida.
  */
