@@ -39,3 +39,15 @@ export const registerPushToken = async (req, res) => {
 
   return success(res, result, StatusCodes.OK);
 };
+
+export const createTestNotification = async (req, res) => {
+  const notification = await notificationsService.createNotification({
+    userId: req.userId,
+    complaintId: "teste123",
+    type: "complaint_update",
+    message: "Notificação de teste",
+    sendPush: false,
+  });
+
+  return success(res, notification, StatusCodes.CREATED);
+};

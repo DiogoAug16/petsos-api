@@ -40,4 +40,10 @@ router.post(
   wrap(notificationsController.registerPushToken),
 );
 
+router.post(
+  "/test",
+  authenticateToken,
+  wrap(notificationsController.createTestNotification),
+);
+
 export default router;
