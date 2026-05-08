@@ -70,18 +70,15 @@ export async function getUserProfilesByIds(userIds) {
   if (!userIds?.length) return [];
 
   const uniqueUserIds = [...new Set(userIds)];
-  const users = [];
 
-  for (const userId of uniqueUserIds) {
-    const doc = await db.collection(USERS_COLLECTION).doc(userId).get();
+  const refs = uniqueUserIds.map((userId) => db.collection(USERS_COLLECTION).doc(userId));
 
-    if (doc.exists) {
-      users.push({
-        id: doc.id,
-        ...doc.data(),
-      });
-    }
-  }
+  const snapshots = await db.getAll(...refs);
 
-  return users;
+  return snapshots
+    .filter((doc) => doc.exists)
+    .map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 }

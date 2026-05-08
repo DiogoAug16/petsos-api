@@ -5,6 +5,7 @@ import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import * as complaintFollowersRepository from "../complaint-followers/complaint-followers.repository.js";
 import * as usersRepository from "../users/users.repository.js";
+import * as followerRepository from "../complaint-followers/complaint-followers.repository.js";
 
 const enrichWithCreator = async (complaints) => {
   if (complaints.length === 0) return [];
@@ -107,4 +108,12 @@ export const getAssumedByUsername = async (username) => {
   if (complaintIds.length === 0) return [];
 
   return await complaintRepository.getByIds(complaintIds);
+};
+
+export const assumeComplaint = async (complaintId, userId) => {
+  await followerRepository.follow(complaintId, userId);
+
+  return {
+    message: "Denúncia assumida com sucesso",
+  };
 };
