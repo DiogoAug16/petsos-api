@@ -45,4 +45,9 @@ router.delete(
   wrap(complaintController.deleteComplaint)
 );
 
+router.post(
+  "/:id/assumir",
+  authenticateToken,
+  wrap(complaintController.assumeComplaint)
+);
 export default router;
