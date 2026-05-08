@@ -2,6 +2,7 @@ import { db } from "../../config/firebase.js";
 import { env } from "../../config/env.js";
 
 const USERNAMES_COLLECTION = `${env.firebase.collectionPrefix}usernames`;
+const USERS_COLLECTION = `${env.firebase.collectionPrefix}users`;
 
 export async function getUidByUsername(username) {
   const doc = await db.collection(USERNAMES_COLLECTION).doc(username.toLowerCase()).get();
@@ -21,6 +22,9 @@ export async function getUsernameByUid(uid) {
   return snapshot.docs[0].id;
 }
 
+/**
+ * Retorna um Map<uid, username>.
+ */
 export async function getUsersByIds(uids) {
   if (!uids?.length) return new Map();
 
@@ -44,4 +48,40 @@ export async function getUsersByIds(uids) {
   );
 
   return usersById;
+}
+
+/**
+ * Atualiza o push token do usuário.
+ */
+export async function updatePushToken(userId, pushToken) {
+  await db.collection(USERS_COLLECTION).doc(userId).set(
+    {
+      pushToken,
+      pushTokenUpdatedAt: new Date(),
+    },
+    { merge: true },
+  );
+}
+
+/**
+ * Busca dados completos dos usuários pelos ids.
+ */
+export async function getUserProfilesByIds(userIds) {
+  if (!userIds?.length) return [];
+
+  const uniqueUserIds = [...new Set(userIds)];
+  const users = [];
+
+  for (const userId of uniqueUserIds) {
+    const doc = await db.collection(USERS_COLLECTION).doc(userId).get();
+
+    if (doc.exists) {
+      users.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    }
+  }
+
+  return users;
 }
