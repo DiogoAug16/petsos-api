@@ -16,6 +16,12 @@ router.post(
   wrap(complaintFollowersController.follow),
 );
 
+router.get(
+  "/:complaintId/me",
+  authenticateToken,
+  wrap(complaintFollowersController.isFollowing),
+);
+
 router.delete(
   "/:complaintId",
   authenticateToken,

@@ -31,3 +31,13 @@ export const listByComplaint = async (req, res) => {
 
   return success(res, result, StatusCodes.OK);
 };
+
+/** @type {import("express").RequestHandler} */
+export const isFollowing = async (req, res) => {
+  const result = await complaintFollowersService.isFollowing({
+    complaintId: req.params.complaintId,
+    userId: req.userId,
+  });
+
+  return success(res, result, StatusCodes.OK);
+};
