@@ -15,12 +15,24 @@ export async function getUserDocument(uid) {
 }
 
 export async function createUserDocument(uid, userData) {
-  await db.collection(USERS_COLLECTION).doc(uid).set({
-    email: userData.email,
-    name: userData.name,
-    username: userData.username.toLowerCase(),
-    createdAt: new Date().toISOString(),
-  });
+  await db
+    .collection(USERS_COLLECTION)
+    .doc(uid)
+    .set({
+      email: userData.email,
+      name: userData.name,
+      username: userData.username.toLowerCase(),
+
+      pushToken: null,
+
+      notificationPreferences: {
+        comments: true,
+        updates: true,
+        statusChanges: true,
+      },
+
+      createdAt: new Date().toISOString(),
+    });
 }
 
 export async function getEmailByUsername(username) {
