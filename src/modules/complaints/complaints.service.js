@@ -56,13 +56,21 @@ export const getDetail = async (id) => {
   return enriched;
 };
 
-export const patch = async (id, body) => {
-  const complaint = {
+export const patch = async (id, body, authenticatedUserId) => {
+  const complaint = await complaintRepository.getDetail(id);
+
+  if (complaint.createdById !== authenticatedUserId) {
+    throw new ForbiddenError("Apenas o criador pode editar esta denuncia");
+  }
+
+  const updatedData = {
     ...body,
     updatedAt: new Date(),
   };
 
-  return await complaintRepository.patch(id, complaint);
+  const updated = await complaintRepository.patch(id, updatedData);
+  const [enriched] = await enrichWithCreator([updated]);
+  return enriched;
 };
 
 export const deleteComplaint = async (id, authenticatedUserId) => {

@@ -33,6 +33,7 @@ router.get(
 
 router.patch(
   "/:id",
+  authenticateToken,
   validateUploadImage,
   validateUpdateComplaint,
   wrap(complaintController.patchComplaint)

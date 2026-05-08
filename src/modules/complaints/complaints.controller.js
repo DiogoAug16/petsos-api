@@ -30,6 +30,7 @@ export const patchComplaint = async (req, res) => {
   const complaint = await complaintService.patch(
     req.params.id,
     req.validatedComplaintData,
+    req.userId,
   );
   const responseData = complaintResponseSchema.parse(complaint);
   return success(res, responseData, StatusCodes.OK);

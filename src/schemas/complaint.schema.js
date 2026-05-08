@@ -49,5 +49,6 @@ export const complaintResponseSchema = complaintBaseSchema.extend({
   followersCount: z.number().default(0),
   createdAt: z.any().optional(),
   updatedAt: z.any().optional(),
+  createdById: z.string().optional(),
   createdByUsername: z.string().nullable().optional(),
 });
