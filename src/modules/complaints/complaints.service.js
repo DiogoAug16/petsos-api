@@ -4,20 +4,7 @@ import { deleteFiles } from "../../shared/helpers/file.helper.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import * as complaintFollowersRepository from "../complaint-followers/complaint-followers.repository.js";
-import * as usersRepository from "../users/users.repository.js";
-import * as followerRepository from "../complaint-followers/complaint-followers.repository.js";
-
-const enrichWithCreator = async (complaints) => {
-  if (complaints.length === 0) return [];
-
-  const creatorIds = complaints.map((complaint) => complaint.createdById).filter(Boolean);
-  const usersById = await usersRepository.getUsersByIds(creatorIds);
-
-  return complaints.map((complaint) => ({
-    ...complaint,
-    createdByUsername: usersById.get(complaint.createdById) ?? null,
-  }));
-};
+import * as usersService from "../users/users.service.js";
 
 export const create = async (complaintData, authenticatedUserId) => {
   const complaintId = complaintRepository.createId();
@@ -48,13 +35,12 @@ export const create = async (complaintData, authenticatedUserId) => {
 
 export const getAll = async () => {
   const complaints = await complaintRepository.getAll();
-  return await enrichWithCreator(complaints);
+  return await usersService.enrichWithCreatedByUsernames(complaints);
 };
 
 export const getDetail = async (id) => {
   const complaint = await complaintRepository.getDetail(id);
-  const [enriched] = await enrichWithCreator([complaint]);
-  return enriched;
+  return await usersService.enrichWithCreatedByUsername(complaint);
 };
 
 export const patch = async (id, body, authenticatedUserId) => {
@@ -70,8 +56,7 @@ export const patch = async (id, body, authenticatedUserId) => {
   };
 
   const updated = await complaintRepository.patch(id, updatedData);
-  const [enriched] = await enrichWithCreator([updated]);
-  return enriched;
+  return await usersService.enrichWithCreatedByUsername(updated);
 };
 
 export const deleteComplaint = async (id, authenticatedUserId) => {
@@ -93,11 +78,11 @@ export const findNearestWithinRadius = async ({ lat, lng, radiusKm }) => {
     lng,
     radiusKm,
   );
-  return await enrichWithCreator(complaints);
+  return await usersService.enrichWithCreatedByUsernames(complaints);
 };
 
-export const getAssumedByUsername = async (username) => {
-  const userId = await usersRepository.getUidByUsername(username);
+export const getFollowedByUsername = async (username) => {
+  const userId = await usersService.getUidByUsername(username);
 
   if (!userId) {
     throw new NotFoundError();
@@ -108,12 +93,4 @@ export const getAssumedByUsername = async (username) => {
   if (complaintIds.length === 0) return [];
 
   return await complaintRepository.getByIds(complaintIds);
-};
-
-export const assumeComplaint = async (complaintId, userId) => {
-  await followerRepository.follow(complaintId, userId);
-
-  return {
-    message: "Denúncia assumida com sucesso",
-  };
 };
