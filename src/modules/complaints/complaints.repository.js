@@ -16,10 +16,6 @@ const toGeoPoint = (data) => {
 export const createId = () => db.collection(COLLECTION).doc().id;
 
 export const create = async (data, id) => {
-  if (!id) {
-    throw new Error("complaint id is required");
-  }
-
   const prepared = toGeoPoint(data);
   const docRef = db.collection(COLLECTION).doc(id);
 

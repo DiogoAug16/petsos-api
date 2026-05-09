@@ -6,7 +6,7 @@ import { complaintResponseSchema } from "../../schemas/complaint.schema.js";
 
 /** @type {import("express").RequestHandler} */
 export const getFollowedComplaints = async (req, res) => {
-  const complaints = await complaintService.getAssumedByUsername(
+  const complaints = await complaintService.getFollowedByUsername(
     req.validatedParams.username,
   );
   const responseData = z.array(complaintResponseSchema).parse(complaints);

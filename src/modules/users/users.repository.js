@@ -11,15 +11,9 @@ export async function getUidByUsername(username) {
 }
 
 export async function getUsernameByUid(uid) {
-  const snapshot = await db
-    .collection(USERNAMES_COLLECTION)
-    .where("uid", "==", uid)
-    .limit(1)
-    .get();
+  const doc = await db.collection(USERS_COLLECTION).doc(uid).get();
 
-  if (snapshot.empty) return null;
-
-  return snapshot.docs[0].id;
+  return doc.exists ? (doc.data().username ?? null) : null;
 }
 
 /**
@@ -29,22 +23,20 @@ export async function getUsersByIds(uids) {
   if (!uids?.length) return new Map();
 
   const uniqueUids = [...new Set(uids)];
+  const refs = uniqueUids.map((uid) => db.collection(USERS_COLLECTION).doc(uid));
   const chunks = [];
-  for (let offset = 0; offset < uniqueUids.length; offset += 10) {
-    chunks.push(uniqueUids.slice(offset, offset + 10));
+
+  for (let offset = 0; offset < refs.length; offset += 100) {
+    chunks.push(refs.slice(offset, offset + 100));
   }
 
-  const snapshots = await Promise.all(
-    chunks.map((chunk) =>
-      db.collection(USERNAMES_COLLECTION).where("uid", "in", chunk).get(),
-    ),
-  );
+  const snapshots = await Promise.all(chunks.map((chunk) => db.getAll(...chunk)));
 
   const usersById = new Map(
     snapshots
-      .flatMap((snapshot) => snapshot.docs)
-      .filter((doc) => doc.data()?.uid)
-      .map((doc) => [doc.data().uid, doc.id]),
+      .flat()
+      .filter((doc) => doc.exists && doc.data()?.username)
+      .map((doc) => [doc.id, doc.data().username]),
   );
 
   return usersById;

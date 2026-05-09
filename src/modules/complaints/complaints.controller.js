@@ -48,9 +48,3 @@ export const getNearest = async (req, res) => {
   const responseData = z.array(complaintResponseSchema).parse(complaints);
   return success(res, responseData, StatusCodes.OK);
 };
-
-/** @type {import("express").RequestHandler} */
-export const assumeComplaint = async (req, res) => {
-  const result = await complaintService.assumeComplaint(req.params.id, req.userId);
-  return success(res, result, StatusCodes.CREATED);
-};

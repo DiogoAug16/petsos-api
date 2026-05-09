@@ -28,7 +28,32 @@
         }
       ]
     },
-
+    {
+      "collectionGroup": "dev_comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "complaintId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "parentCommentId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "score",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ]
+    },
     {
       "collectionGroup": "dev_notifications",
       "queryScope": "COLLECTION",
@@ -47,7 +72,6 @@
         }
       ]
     },
-
     {
       "collectionGroup": "dev_notifications",
       "queryScope": "COLLECTION",
