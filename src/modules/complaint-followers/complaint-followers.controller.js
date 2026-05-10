@@ -4,7 +4,7 @@ import { success } from "../../shared/utils/response.util.js";
 
 export const follow = async (req, res) => {
   const result = await complaintFollowersService.follow({
-    complaintId: req.validatedFollowData.complaintId,
+    complaintId: req.params.complaintId,
     userId: req.userId,
   });
 
@@ -40,14 +40,4 @@ export const isFollowing = async (req, res) => {
   });
 
   return success(res, result, StatusCodes.OK);
-};
-
-/** @type {import("express").RequestHandler} */
-export const followByParam = async (req, res) => {
-  const result = await complaintFollowersService.follow({
-    complaintId: req.params.complaintId,
-    userId: req.userId,
-  });
-
-  return success(res, result, StatusCodes.CREATED);
 };
