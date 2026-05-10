@@ -10,15 +10,22 @@ const COLLECTION = `${env.firebase.collectionPrefix}notifications`;
 /**
  * Cria uma nova notificação no Firestore.
  */
-export const create = async ({ userId, complaintId, type, message }) => {
+export const create = async ({
+  userId,
+  complaintId,
+  type,
+  message,
+  count = 1,
+  grouped = false,
+}) => {
   const notificationData = {
     userId,
     complaintId,
     type,
     message,
     read: false,
-    grouped: false,
-    count: 1,
+    grouped,
+    count,
     createdAt: new Date(),
   };
 
@@ -127,4 +134,22 @@ export const markAsGrouped = async (notificationIds) => {
   });
 
   await batch.commit();
+};
+
+/**
+ * Busca notificações de comentários não agrupadas
+ * para o job de agrupamento.
+ */
+export const findUngroupedCommentNotifications = async () => {
+  const snapshot = await db
+    .collection(COLLECTION)
+    .where("type", "==", "new_comment")
+    .where("grouped", "==", false)
+    .where("read", "==", false)
+    .get();
+
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
 };

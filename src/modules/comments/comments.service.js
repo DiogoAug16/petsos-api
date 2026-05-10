@@ -1,12 +1,22 @@
 import * as commentsRepository from "./comments.repository.js";
 import * as usersService from "../users/users.service.js";
 import * as commentLikesRepository from "../comment-likes/comment-likes.repository.js";
+import * as notificationsService from "../notifications/notifications.service.js";
+
 
 export const create = async ({ complaintId, userId, text }) => {
   const comment = await commentsRepository.create({
     complaintId,
     userId,
     text,
+  });
+
+  await notificationsService.notifyComplaintFollowers({
+    complaintId,
+    actorUserId: userId,
+    type: "new_comment",
+    message: "Novo comentário em uma denúncia que você acompanha.",
+    sendPush: false,
   });
 
   return await usersService.enrichWithUsername(comment);
