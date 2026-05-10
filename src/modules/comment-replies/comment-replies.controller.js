@@ -19,9 +19,10 @@ export const create = async (req, res) => {
 
 /** @type {import("express").RequestHandler} */
 export const getByCommentId = async (req, res) => {
-  const replies = await commentRepliesService.getByCommentId(
-    req.validatedCommentRepliesQuery,
-  );
+  const replies = await commentRepliesService.getByCommentId({
+    ...req.validatedCommentRepliesQuery,
+    userId: req.userId,
+  });
   const responseData = commentRepliesPageResponseSchema.parse(replies);
 
   return success(res, responseData, StatusCodes.OK);

@@ -27,6 +27,7 @@ export const baseCommentResponseSchema = z.object({
   text: z.string(),
   createdAt: z.string().datetime(),
   likes: z.number().default(0),
+  likedByMe: z.boolean().default(false),
   username: z.string().nullable().optional(),
 });
 
