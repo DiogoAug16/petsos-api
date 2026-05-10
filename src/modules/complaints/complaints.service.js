@@ -5,6 +5,7 @@ import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import * as complaintFollowersRepository from "../complaint-followers/complaint-followers.repository.js";
 import * as usersService from "../users/users.service.js";
+import * as notificationsService from "../notifications/notifications.service.js";
 
 export const create = async (complaintData, authenticatedUserId) => {
   const complaintId = complaintRepository.createId();
@@ -56,6 +57,14 @@ export const patch = async (id, body, authenticatedUserId) => {
   };
 
   const updated = await complaintRepository.patch(id, updatedData);
+
+  await notificationsService.notifyComplaintFollowers({
+    complaintId: id,
+    actorUserId: authenticatedUserId,
+    type: "complaint_update",
+    message: "Uma denúncia que você acompanha foi atualizada.",
+    sendPush: true,
+  });
   return await usersService.enrichWithCreatedByUsername(updated);
 };
 
