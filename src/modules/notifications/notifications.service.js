@@ -3,6 +3,7 @@ import { env } from "../../config/env.js";
 
 import * as notificationsRepository from "./notifications.repository.js";
 import * as usersRepository from "../users/users.repository.js";
+import * as complaintFollowersRepository from "../complaint-followers/complaint-followers.repository.js";
 
 const USERS_COLLECTION = `${env.firebase.collectionPrefix}users`;
 
@@ -15,6 +16,8 @@ export const createNotification = async ({
   type,
   message,
   sendPush = true,
+  count = 1,
+  grouped = false,
 }) => {
   const userDoc = await db.collection(USERS_COLLECTION).doc(userId).get();
 
@@ -46,6 +49,8 @@ export const createNotification = async ({
     complaintId,
     type,
     message,
+    count,
+    grouped,
   });
 
   return {
@@ -91,4 +96,34 @@ export const countUnread = async (userId) => {
   return {
     count,
   };
+};
+
+/**
+ * Notifica os seguidores de uma denúncia,
+ * exceto o usuário que executou a ação.
+ */
+export const notifyComplaintFollowers = async ({
+  complaintId,
+  actorUserId,
+  type,
+  message,
+  sendPush = false,
+}) => {
+  const followerIds = await complaintFollowersRepository.getFollowers(complaintId);
+
+  const followersToNotify = followerIds.filter(
+    (followerId) => followerId !== actorUserId,
+  );
+
+  return await Promise.all(
+    followersToNotify.map((followerId) =>
+      createNotification({
+        userId: followerId,
+        complaintId,
+        type,
+        message,
+        sendPush,
+      }),
+    ),
+  );
 };
