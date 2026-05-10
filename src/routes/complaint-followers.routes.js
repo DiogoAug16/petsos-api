@@ -16,6 +16,12 @@ router.post(
   wrap(complaintFollowersController.follow),
 );
 
+router.post(
+  "/:complaintId/assumir",
+  authenticateToken,
+  complaintFollowersController.followByParam,
+);
+
 router.get(
   "/:complaintId/me",
   authenticateToken,
