@@ -17,6 +17,7 @@ export const cursorPageInfoSchema = z.object({
   limit: z.number().int().min(1),
   hasMore: z.boolean(),
   nextCursor: z.string().nullable(),
+  totalItems: z.number().int().min(0).optional(),
 });
 
 export const paginatedResponseSchema = (itemSchema) =>

@@ -29,10 +29,14 @@ const getComplaintSnapshotOrFail = async (complaintId) => {
   return complaintDoc;
 };
 
-const buildCommentsQuery = (complaintId) => {
+const buildCommentsBaseQuery = (complaintId) => {
   return commentsCollection()
     .where("complaintId", "==", complaintId)
-    .where("parentCommentId", "==", null)
+    .where("parentCommentId", "==", null);
+};
+
+const buildCommentsQuery = (complaintId) => {
+  return buildCommentsBaseQuery(complaintId)
     .orderBy("score", "desc")
     .orderBy("createdAt", "desc")
     .orderBy(DOCUMENT_ID_FIELD);
@@ -53,6 +57,11 @@ const getCommentsPage = async ({ complaintId, limit, cursor }) => {
     getCursorValuesFromDoc,
     mapDoc: (doc) => serialize(doc.id, doc.data()),
   });
+};
+
+const countCommentsByComplaintId = async (complaintId) => {
+  const snapshot = await buildCommentsBaseQuery(complaintId).count().get();
+  return snapshot.data().count;
 };
 
 export const create = async ({ complaintId, userId, text }) => {
@@ -85,14 +94,21 @@ export const create = async ({ complaintId, userId, text }) => {
 };
 
 export const getByComplaintId = async ({ complaintId, limit, cursor }) => {
-  const [, commentsPage] = await Promise.all([
+  const [, commentsPage, totalItems] = await Promise.all([
     getComplaintSnapshotOrFail(complaintId),
     getCommentsPage({
       complaintId,
       limit,
       cursor,
     }),
+    countCommentsByComplaintId(complaintId),
   ]);
 
-  return commentsPage;
+  return {
+    ...commentsPage,
+    pageInfo: {
+      ...commentsPage.pageInfo,
+      totalItems,
+    },
+  };
 };

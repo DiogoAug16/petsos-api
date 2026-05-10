@@ -19,6 +19,29 @@ const getLikeDocRef = (commentId, userId) => {
 
 const getCommentRef = (commentId) => commentsCollection().doc(commentId);
 
+export const getLikedCommentIdsByUser = async (commentIds, userId) => {
+  if (!userId || !commentIds?.length) return new Set();
+
+  const uniqueCommentIds = [...new Set(commentIds.filter(Boolean))];
+  if (!uniqueCommentIds.length) return new Set();
+
+  const refs = uniqueCommentIds.map((commentId) => getLikeDocRef(commentId, userId));
+  const chunks = [];
+
+  for (let offset = 0; offset < refs.length; offset += 100) {
+    chunks.push(refs.slice(offset, offset + 100));
+  }
+
+  const snapshots = await Promise.all(chunks.map((chunk) => db.getAll(...chunk)));
+
+  return new Set(
+    snapshots
+      .flat()
+      .filter((doc) => doc.exists)
+      .map((doc) => doc.data().commentId),
+  );
+};
+
 const validateComment = (commentDoc, complaintId) => {
   if (!commentDoc.exists || commentDoc.data()?.complaintId !== complaintId) {
     throw new NotFoundError(ERROR_CODES.COMMENT_NOT_FOUND);

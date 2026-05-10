@@ -18,9 +18,10 @@ export const create = async (req, res) => {
 
 /** @type {import("express").RequestHandler} */
 export const getByComplaintId = async (req, res) => {
-  const comments = await commentsService.getTopLevelByComplaintId(
-    req.validatedCommentsQuery,
-  );
+  const comments = await commentsService.getTopLevelByComplaintId({
+    ...req.validatedCommentsQuery,
+    userId: req.userId,
+  });
   const responseData = commentsPageResponseSchema.parse(comments);
   return success(res, responseData, StatusCodes.OK);
 };
