@@ -1,7 +1,34 @@
 import * as usersRepository from "./users.repository.js";
+import { NotFoundError } from "../../shared/errors/not-found.error.js";
+
+const toPublicProfile = (profile) => ({
+  name: profile.name ?? null,
+  username: profile.username,
+  createdAt: profile.createdAt,
+});
 
 export const getUidByUsername = async (username) => {
   return await usersRepository.getUidByUsername(username);
+};
+
+export const getPublicProfileByUsername = async (username) => {
+  const profile = await usersRepository.getUserByUsername(username);
+
+  if (!profile) {
+    throw new NotFoundError();
+  }
+
+  return toPublicProfile(profile);
+};
+
+export const getPublicProfileById = async (userId) => {
+  const profile = await usersRepository.getUserById(userId);
+
+  if (!profile) {
+    throw new NotFoundError();
+  }
+
+  return toPublicProfile(profile);
 };
 
 export const getUsernamesByIds = async (uids) => {

@@ -16,6 +16,20 @@ export async function getUsernameByUid(uid) {
   return doc.exists ? (doc.data().username ?? null) : null;
 }
 
+export async function getUserById(uid) {
+  const doc = await db.collection(USERS_COLLECTION).doc(uid).get();
+
+  return doc.exists ? doc.data() : null;
+}
+
+export async function getUserByUsername(username) {
+  const uid = await getUidByUsername(username);
+
+  if (!uid) return null;
+
+  return await getUserById(uid);
+}
+
 /**
  * Retorna um Map<uid, username>.
  */
