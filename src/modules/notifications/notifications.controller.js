@@ -44,9 +44,11 @@ export const createTestNotification = async (req, res) => {
   const notification = await notificationsService.createNotification({
     userId: req.userId,
     complaintId: "teste123",
-    type: "complaint_update",
-    message: "Notificação de teste",
+    type: "comment_group",
+    message: "3 novos comentários em uma denúncia que você acompanha.",
     sendPush: false,
+    grouped: true,
+    count: 3,
   });
 
   return success(res, notification, StatusCodes.CREATED);
