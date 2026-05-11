@@ -29,7 +29,6 @@ router.delete(
 
 router.get(
   "/:complaintId/count",
-  authenticateToken,
   validateComplaintIdParam,
   wrap(complaintFollowersController.count),
 );
