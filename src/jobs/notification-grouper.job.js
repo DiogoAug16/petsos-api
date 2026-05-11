@@ -8,7 +8,7 @@ import * as notificationsService from "../modules/notifications/notifications.se
  * a cada 15 minutos.
  */
 export const startNotificationGrouperJob = () => {
-  cron.schedule("*/15 * * * *", async () => {
+  cron.schedule("*/1 * * * *", async () => {
     const notifications =
       await notificationsRepository.findUngroupedCommentNotifications();
 
@@ -38,6 +38,7 @@ export const startNotificationGrouperJob = () => {
         message: `${group.length} novos comentários em uma denúncia que você acompanha.`,
         sendPush: true,
         count: group.length,
+        grouped: true,
       });
 
       await notificationsRepository.markAsGrouped(

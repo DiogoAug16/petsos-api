@@ -130,6 +130,8 @@ export const markAsGrouped = async (notificationIds) => {
 
     batch.update(ref, {
       grouped: true,
+      read: true,
+      readAt: new Date(),
     });
   });
 
