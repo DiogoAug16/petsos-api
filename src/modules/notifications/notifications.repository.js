@@ -97,61 +97,35 @@ export const countUnread = async (userId) => {
 };
 
 /**
- * Busca notificações não lidas e não agrupadas
- * criadas nos últimos 15 minutos para agrupamento.
+ * Busca notificação de comentário não lida para agrupamento inline.
  */
-export const getPendingGroupable = async (userId, complaintId, type) => {
-  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-
+export const findUnreadCommentNotification = async (userId, complaintId) => {
   const snapshot = await db
     .collection(COLLECTION)
     .where("userId", "==", userId)
     .where("complaintId", "==", complaintId)
-    .where("type", "==", type)
+    .where("type", "in", ["new_comment", "comment_group"])
     .where("read", "==", false)
-    .where("grouped", "==", false)
-    .where("createdAt", ">=", fifteenMinutesAgo)
+    .limit(1)
     .get();
 
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+  if (snapshot.empty) return null;
+
+  const doc = snapshot.docs[0];
+  return { id: doc.id, ...doc.data() };
 };
 
 /**
- * Marca notificações como agrupadas utilizando batch update.
+ * Atualiza notificação existente para agrupar novo comentário.
  */
-export const markAsGrouped = async (notificationIds) => {
-  const batch = db.batch();
+export const incrementGroupCount = async (notificationId, newCount) => {
+  const docRef = db.collection(COLLECTION).doc(notificationId);
 
-  notificationIds.forEach((id) => {
-    const ref = db.collection(COLLECTION).doc(id);
-
-    batch.update(ref, {
-      grouped: true,
-      read: true,
-      readAt: new Date(),
-    });
+  await docRef.update({
+    type: "comment_group",
+    message: `${newCount} novos comentários em uma denúncia que você acompanha.`,
+    count: newCount,
+    grouped: true,
+    createdAt: new Date(),
   });
-
-  await batch.commit();
-};
-
-/**
- * Busca notificações de comentários não agrupadas
- * para o job de agrupamento.
- */
-export const findUngroupedCommentNotifications = async () => {
-  const snapshot = await db
-    .collection(COLLECTION)
-    .where("type", "==", "new_comment")
-    .where("grouped", "==", false)
-    .where("read", "==", false)
-    .get();
-
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
 };
