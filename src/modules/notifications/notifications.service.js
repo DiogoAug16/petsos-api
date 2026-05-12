@@ -115,6 +115,14 @@ export const notifyComplaintFollowers = async ({
     (followerId) => followerId !== actorUserId,
   );
 
+  if (type === "new_comment") {
+    return await Promise.all(
+      followersToNotify.map((followerId) =>
+        groupCommentNotification({ userId: followerId, complaintId }),
+      ),
+    );
+  }
+
   return await Promise.all(
     followersToNotify.map((followerId) =>
       createNotification({
@@ -126,4 +134,30 @@ export const notifyComplaintFollowers = async ({
       }),
     ),
   );
+};
+
+/**
+ * Agrupa notificação de comentário inline.
+ * Se já existe notificação não lida pro mesmo user+complaint,
+ * incrementa o contador. Senão, cria nova.
+ */
+const groupCommentNotification = async ({ userId, complaintId }) => {
+  const existing = await notificationsRepository.findUnreadCommentNotification(
+    userId,
+    complaintId,
+  );
+
+  if (existing) {
+    const newCount = (existing.count || 1) + 1;
+    await notificationsRepository.incrementGroupCount(existing.id, newCount);
+    return { id: existing.id, count: newCount, grouped: true };
+  }
+
+  return await createNotification({
+    userId,
+    complaintId,
+    type: "new_comment",
+    message: "Novo comentário em uma denúncia que você acompanha.",
+    sendPush: false,
+  });
 };

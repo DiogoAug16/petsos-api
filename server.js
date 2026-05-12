@@ -6,7 +6,6 @@ import routes from "./src/routes/index.js";
 import { errorHandler } from "./src/shared/middlewares/error.middleware.js";
 import { httpLogger } from "./src/config/pino-http.config.js";
 import logger from "./src/logger/index.js";
-import { startNotificationGrouperJob } from "./src/jobs/notification-grouper.job.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,7 +21,6 @@ app.use(errorHandler);
 
 const server = app.listen(PORT, () => {
   logger.info(`Servidor rodando na porta ${PORT}`);
-  startNotificationGrouperJob();
 });
 
 server.on("error", (error) => {
