@@ -34,3 +34,29 @@ export const updateComplaintSchema = complaintBaseSchema
     message: "Nenhum campo fornecido para atualização",
     path: ["_root"],
   });
+
+export const nearestQuerySchema = z.object({
+  query: z.object({
+    lat: z.coerce.number().min(-90).max(90),
+    lng: z.coerce.number().min(-180).max(180),
+    radiusKm: z.coerce.number().positive(),
+  }),
+});
+
+export const complaintResponseSchema = complaintBaseSchema.extend({
+  id: z.string(),
+  status: z.enum(VALID_COMPLAINT_STATUS),
+  followersCount: z.number().default(0),
+  createdAt: z.any().optional(),
+  updatedAt: z.any().optional(),
+  createdById: z.string().optional(),
+  createdByUsername: z.string().nullable().optional(),
+});
+
+export const publicComplaintSummarySchema = complaintBaseSchema.extend({
+  id: z.string(),
+  status: z.enum(VALID_COMPLAINT_STATUS),
+  followersCount: z.number().default(0),
+  createdAt: z.any().optional(),
+  updatedAt: z.any().optional(),
+});

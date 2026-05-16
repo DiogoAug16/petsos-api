@@ -13,13 +13,14 @@ const toGeoPoint = (data) => {
   return { ...data, location: new GeoPoint(latitude, longitude) };
 };
 
-export const create = async (data) => {
-  const prepared = toGeoPoint(data);
+export const createId = () => db.collection(COLLECTION).doc().id;
 
-  console.log("Prepared:", prepared);
-  console.log("Location:", prepared.location);
-  console.log("É GeoPoint?", prepared.location instanceof GeoPoint);
-  const docRef = await db.collection(COLLECTION).add(prepared);
+export const create = async (data, id) => {
+  const prepared = toGeoPoint(data);
+  const docRef = db.collection(COLLECTION).doc(id);
+
+  await docRef.set(prepared);
+
   return serialize(docRef.id, {
     ...prepared,
     createdAt: data.createdAt,
@@ -54,9 +55,25 @@ export const deleteComplaint = async (id) => {
   await db.collection(COLLECTION).doc(id).delete();
 };
 
-// Busca denúncias próximas a uma coordenada dentro de um raio em quilômetros.
-// Exemplo de como usar abaixo:
-//http://localhost:3000/api/complaints/nearest?lat=-15.622433350841794&lng=-56.17044635117054&radiusKm=5
+export const getByIds = async (ids) => {
+  if (!ids || ids.length === 0) return [];
+
+  const docRefs = ids.map((id) => db.collection(COLLECTION).doc(id));
+
+  const chunks = [];
+  for (let offset = 0; offset < docRefs.length; offset += 100) {
+    chunks.push(docRefs.slice(offset, offset + 100));
+  }
+
+  const snapshots = await Promise.all(chunks.map((chunk) => db.getAll(...chunk)));
+
+  const complaints = snapshots
+    .flat()
+    .filter((doc) => doc.exists)
+    .map((doc) => serialize(doc.id, doc.data()));
+
+  return complaints;
+};
 
 export const findNearestWithinRadius = async (lat, lng, radiusKm) => {
   const center = [Number(lat), Number(lng)];

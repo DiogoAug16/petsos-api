@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "",
   "main": "server.js",
   "scripts": {
@@ -29,6 +29,7 @@
     "geofire-common": "^6.0.0",
     "http-status-codes": "^2.3.0",
     "multer": "^2.1.1",
+    "node-cron": "^4.2.1",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "zod": "^4.3.6"
