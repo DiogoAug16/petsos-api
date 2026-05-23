@@ -47,6 +47,7 @@ export const complaintResponseSchema = complaintBaseSchema.extend({
   id: z.string(),
   status: z.enum(VALID_COMPLAINT_STATUS),
   followersCount: z.number().default(0),
+  volunteersCount: z.number().default(0),
   createdAt: z.any().optional(),
   updatedAt: z.any().optional(),
   statusUpdatedAt: z.any().optional(),

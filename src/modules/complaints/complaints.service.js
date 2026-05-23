@@ -25,6 +25,7 @@ export const create = async (complaintData, authenticatedUserId) => {
     createdById: authenticatedUserId,
     status: COMPLAINT_STATUS.OPEN,
     followersCount: 1,
+    volunteersCount: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
