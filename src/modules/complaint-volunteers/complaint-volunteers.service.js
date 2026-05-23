@@ -1,7 +1,9 @@
 import * as complaintVolunteersRepository from "./complaint-volunteers.repository.js";
 import * as complaintFollowersRepository from "../complaint-followers/complaint-followers.repository.js";
+import * as complaintRepository from "../complaints/complaints.repository.js";
 import * as usersService from "../users/users.service.js";
 import * as notificationsService from "../notifications/notifications.service.js";
+import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
 
 export const volunteer = async ({ complaintId, userId }) => {
   await complaintVolunteersRepository.volunteer(complaintId, userId);
@@ -12,6 +14,11 @@ export const volunteer = async ({ complaintId, userId }) => {
   );
   if (!alreadyFollowing) {
     await complaintFollowersRepository.follow(complaintId, userId);
+  }
+
+  const complaint = await complaintRepository.getDetail(complaintId);
+  if (complaint.status === COMPLAINT_STATUS.OPEN) {
+    await complaintRepository.setStatus(complaintId, COMPLAINT_STATUS.IN_PROGRESS);
   }
 
   await notificationsService.notifyComplaintFollowers({
@@ -29,6 +36,14 @@ export const volunteer = async ({ complaintId, userId }) => {
 
 export const unvolunteer = async ({ complaintId, userId }) => {
   await complaintVolunteersRepository.unvolunteer(complaintId, userId);
+
+  const remaining = await complaintVolunteersRepository.countByComplaintId(complaintId);
+  if (remaining === 0) {
+    const complaint = await complaintRepository.getDetail(complaintId);
+    if (complaint.status === COMPLAINT_STATUS.IN_PROGRESS) {
+      await complaintRepository.setStatus(complaintId, COMPLAINT_STATUS.OPEN);
+    }
+  }
 
   return {
     message: "Você deixou de ser voluntário nesta denúncia",
