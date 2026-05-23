@@ -19,6 +19,14 @@ export const volunteer = async ({ complaintId, userId }) => {
   const complaint = await complaintRepository.getDetail(complaintId);
   if (complaint.status === COMPLAINT_STATUS.OPEN) {
     await complaintRepository.setStatus(complaintId, COMPLAINT_STATUS.IN_PROGRESS);
+
+    await notificationsService.notifyComplaintFollowers({
+      complaintId,
+      actorUserId: userId,
+      type: "status_change",
+      message: `O status da denúncia "${complaint.title}" foi alterado para "em_andamento".`,
+      sendPush: false,
+    });
   }
 
   await notificationsService.notifyComplaintFollowers({
@@ -26,7 +34,7 @@ export const volunteer = async ({ complaintId, userId }) => {
     actorUserId: userId,
     type: "complaint_volunteer",
     message: "Alguém se voluntariou para resolver uma denúncia que você acompanha.",
-    sendPush: true,
+    sendPush: false,
   });
 
   return {
@@ -42,6 +50,14 @@ export const unvolunteer = async ({ complaintId, userId }) => {
     const complaint = await complaintRepository.getDetail(complaintId);
     if (complaint.status === COMPLAINT_STATUS.IN_PROGRESS) {
       await complaintRepository.setStatus(complaintId, COMPLAINT_STATUS.OPEN);
+
+      await notificationsService.notifyComplaintFollowers({
+        complaintId,
+        actorUserId: userId,
+        type: "status_change",
+        message: `O status da denúncia "${complaint.title}" voltou para "aberto".`,
+        sendPush: false,
+      });
     }
   }
 

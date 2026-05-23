@@ -1,6 +1,11 @@
+import { db } from "../../config/firebase.js";
+import { env } from "../../config/env.js";
 import * as commentRepliesRepository from "./comment-replies.repository.js";
 import * as usersService from "../users/users.service.js";
 import * as commentLikesRepository from "../comment-likes/comment-likes.repository.js";
+import * as notificationsService from "../notifications/notifications.service.js";
+
+const COMMENTS_COLLECTION = `${env.firebase.collectionPrefix}comments`;
 
 export const create = async ({ complaintId, commentId, userId, text }) => {
   const reply = await commentRepliesRepository.create({
@@ -9,6 +14,21 @@ export const create = async ({ complaintId, commentId, userId, text }) => {
     userId,
     text,
   });
+
+  const commentDoc = await db.collection(COMMENTS_COLLECTION).doc(commentId).get();
+  if (commentDoc.exists) {
+    const commentOwnerId = commentDoc.data().userId;
+
+    if (commentOwnerId && commentOwnerId !== userId) {
+      await notificationsService.createNotification({
+        userId: commentOwnerId,
+        complaintId,
+        type: "comment_reply",
+        message: "Alguém respondeu ao seu comentário.",
+        sendPush: false,
+      });
+    }
+  }
 
   return await usersService.enrichWithUsername(reply);
 };

@@ -97,6 +97,15 @@ export const updateStatus = async (complaintId, newStatus, authenticatedUserId) 
   }
 
   const updated = await complaintRepository.setStatus(complaintId, newStatus);
+
+  await notificationsService.notifyComplaintFollowers({
+    complaintId,
+    actorUserId: authenticatedUserId,
+    type: "status_change",
+    message: `O status da denúncia "${complaint.title}" foi alterado para "${newStatus}".`,
+    sendPush: false,
+  });
+
   return await usersService.enrichWithCreatedByUsername(updated);
 };
 
