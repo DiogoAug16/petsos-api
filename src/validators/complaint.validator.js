@@ -3,6 +3,7 @@ import { ERROR_CODES } from "../shared/types/error.codes.js";
 import {
   createComplaintSchema,
   updateComplaintSchema,
+  updateStatusSchema,
   nearestQuerySchema,
 } from "../schemas/complaint.schema.js";
 import { z } from "zod";
@@ -32,6 +33,18 @@ export const validateUpdateComplaint = (req, res, next) => {
   }
 
   req.validatedComplaintData = result.data;
+  next();
+};
+
+export const validateUpdateStatus = (req, res, next) => {
+  const result = updateStatusSchema.safeParse(req.body);
+
+  if (!result.success) {
+    const errors = z.flattenError(result.error);
+    throw new ValidationError(errors, ERROR_CODES.COMPLAINT_VALIDATION);
+  }
+
+  req.validatedStatusData = result.data;
   next();
 };
 

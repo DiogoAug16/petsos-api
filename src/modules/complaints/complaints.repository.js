@@ -51,6 +51,17 @@ export const patch = async (id, data) => {
   return serialize(id, updated);
 };
 
+export const setStatus = async (id, status) => {
+  const docRef = db.collection(COLLECTION).doc(id);
+  const doc = await docRef.get();
+  if (!doc.exists) throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+
+  await docRef.update({ status, statusUpdatedAt: new Date(), updatedAt: new Date() });
+
+  const updated = (await docRef.get()).data();
+  return serialize(id, updated);
+};
+
 export const deleteComplaint = async (id) => {
   await db.collection(COLLECTION).doc(id).delete();
 };

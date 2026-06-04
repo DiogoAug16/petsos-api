@@ -6,6 +6,7 @@ import { validateUploadImage } from "../validators/upload.validator.js";
 import {
   validateCreateComplaint,
   validateUpdateComplaint,
+  validateUpdateStatus,
   validateNearestQuery,
 } from "../validators/complaint.validator.js";
 import { authenticateToken } from "../shared/middlewares/auth.middleware.js";
@@ -27,6 +28,13 @@ router.get("/nearest", validateNearestQuery, wrap(complaintController.getNearest
 router.use("/:id/comments", commentsRoutes);
 
 router.get("/:id", wrap(complaintController.getDetail));
+
+router.patch(
+  "/:id/status",
+  authenticateToken,
+  validateUpdateStatus,
+  wrap(complaintController.updateStatus),
+);
 
 router.patch(
   "/:id",

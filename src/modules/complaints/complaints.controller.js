@@ -37,6 +37,17 @@ export const patchComplaint = async (req, res) => {
 };
 
 /** @type {import("express").RequestHandler} */
+export const updateStatus = async (req, res) => {
+  const complaint = await complaintService.updateStatus(
+    req.params.id,
+    req.validatedStatusData.status,
+    req.userId,
+  );
+  const responseData = complaintResponseSchema.parse(complaint);
+  return success(res, responseData, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
 export const deleteComplaint = async (req, res) => {
   const complaint = await complaintService.deleteComplaint(req.params.id, req.userId);
   return success(res, complaint, StatusCodes.OK);
