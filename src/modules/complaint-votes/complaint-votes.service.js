@@ -7,6 +7,7 @@ import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { ValidationError } from "../../shared/errors/validation.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
+import { env } from "../../config/env.js";
 
 const VOTE_THRESHOLD_PERCENTAGE = 0.5;
 const OWNER_RESPONSE_DAYS = 7;
@@ -20,6 +21,32 @@ const isOwnerInactive = (complaint) => {
   const daysSinceUpdate =
     (Date.now() - new Date(statusUpdatedAt).getTime()) / (1000 * 60 * 60 * 24);
   return daysSinceUpdate >= OWNER_RESPONSE_DAYS;
+};
+
+const checkAndApplyAutoResolveByValidationCount = async (complaint, complaintId) => {
+  // Se já está resolvido, não fazer nada
+  if (complaint.status === COMPLAINT_STATUS.RESOLVED) {
+    return { autoResolved: false };
+  }
+
+  const counts = await complaintVotesRepository.countByComplaintId(complaintId);
+  const minValidations = env.complaints.minValidationsAutoResolve;
+
+  // Se o total de validações atingiu o threshold, resolver automaticamente
+  if (counts.total >= minValidations) {
+    await complaintRepository.setStatusWithMetadata(
+      complaintId,
+      COMPLAINT_STATUS.RESOLVED,
+      {
+        resolvedBy: "community",
+        resolvedAt: new Date(),
+      },
+    );
+
+    return { autoResolved: true, reason: "validation_count_threshold" };
+  }
+
+  return { autoResolved: false };
 };
 
 export const vote = async ({ complaintId, userId, approved }) => {
@@ -66,8 +93,16 @@ export const vote = async ({ complaintId, userId, approved }) => {
   const counts = await complaintVotesRepository.countByComplaintId(complaintId);
   const approvalThreshold = Math.ceil(totalEligible * VOTE_THRESHOLD_PERCENTAGE);
 
+  // Verificar resolução por percentual (50%)
   if (counts.approved >= approvalThreshold) {
-    await complaintRepository.setStatus(complaintId, COMPLAINT_STATUS.RESOLVED);
+    await complaintRepository.setStatusWithMetadata(
+      complaintId,
+      COMPLAINT_STATUS.RESOLVED,
+      {
+        resolvedBy: "community",
+        resolvedAt: new Date(),
+      },
+    );
 
     await notificationsService.notifyComplaintFollowers({
       complaintId,
@@ -80,6 +115,28 @@ export const vote = async ({ complaintId, userId, approved }) => {
     return {
       message: "Voto registrado. Denúncia resolvida por votação da comunidade.",
       resolved: true,
+      reason: "approval_percentage_threshold",
+    };
+  }
+
+  // Verificar resolução por contagem total de validações
+  const autoResolveCheck = await checkAndApplyAutoResolveByValidationCount(
+    complaint,
+    complaintId,
+  );
+  if (autoResolveCheck.autoResolved) {
+    await notificationsService.notifyComplaintFollowers({
+      complaintId,
+      actorUserId: userId,
+      type: "status_change",
+      message: `A denúncia "${complaint.title}" foi resolvida automaticamente pela comunidade (limite de validações atingido).`,
+      sendPush: false,
+    });
+
+    return {
+      message: `Voto registrado. Denúncia resolvida automaticamente (${env.complaints.minValidationsAutoResolve} validações atingidas).`,
+      resolved: true,
+      reason: "validation_count_threshold",
     };
   }
 
@@ -88,6 +145,7 @@ export const vote = async ({ complaintId, userId, approved }) => {
     resolved: false,
     votes: counts,
     threshold: approvalThreshold,
+    autoResolveThreshold: env.complaints.minValidationsAutoResolve,
   };
 };
 
@@ -114,5 +172,13 @@ export const getStatus = async (complaintId, userId) => {
     votes: counts,
     threshold: Math.ceil(eligibleVoters.size * VOTE_THRESHOLD_PERCENTAGE),
     totalEligible: eligibleVoters.size,
+    autoResolveThreshold: env.complaints.minValidationsAutoResolve,
+    validationsProgress: {
+      current: counts.total,
+      required: env.complaints.minValidationsAutoResolve,
+      willAutoResolve:
+        counts.total >= env.complaints.minValidationsAutoResolve &&
+        complaint.status !== COMPLAINT_STATUS.RESOLVED,
+    },
   };
 };
