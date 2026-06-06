@@ -2,6 +2,7 @@ import { Router } from "express";
 import * as complaintController from "../modules/complaints/complaints.controller.js";
 import * as complaintEvidenceController from "../modules/complaint-evidence/complaint-evidence.controller.js";
 import * as complaintVotesController from "../modules/complaint-votes/complaint-votes.controller.js";
+import * as complaintValidationsController from "../modules/complaint-validations/complaint-validations.controller.js";
 import commentsRoutes from "./comments.routes.js";
 import { wrap } from "../shared/utils/async-handler.util.js";
 import { validateUploadImage } from "../validators/upload.validator.js";
@@ -37,6 +38,11 @@ router.post(
   validateUploadImage,
   validateSubmitEvidence,
   wrap(complaintEvidenceController.submitEvidence),
+);
+
+router.get(
+  "/:id/validations/count",
+  wrap(complaintValidationsController.countByComplaintId),
 );
 
 router.get("/:id/evidences", wrap(complaintEvidenceController.getByComplaintId));
