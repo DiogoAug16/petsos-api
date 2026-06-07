@@ -66,6 +66,12 @@ router.get(
   wrap(complaintVotesController.getStatus),
 );
 
+router.post(
+  "/:id/confirm-resolution",
+  authenticateToken,
+  wrap(complaintController.confirmResolution),
+);
+
 router.get("/:id", wrap(complaintController.getDetail));
 
 router.patch(
