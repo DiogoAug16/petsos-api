@@ -175,5 +175,13 @@ export const confirmResolution = async (complaintId, authenticatedUserId) => {
 
   const updated = await complaintRepository.confirmResolution(complaintId);
 
+  await notificationsService.notifyComplaintFollowers({
+    complaintId,
+    actorUserId: authenticatedUserId,
+    type: "complaint_resolved",
+    message: `A denúncia "${complaint.title}" foi marcada como resolvida pelo autor.`,
+    sendPush: false,
+  });
+
   return await usersService.enrichWithCreatedByUsername(updated);
 };
