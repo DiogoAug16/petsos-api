@@ -59,3 +59,12 @@ export const getNearest = async (req, res) => {
   const responseData = z.array(complaintResponseSchema).parse(complaints);
   return success(res, responseData, StatusCodes.OK);
 };
+
+/** @type {import("express").RequestHandler} */
+export const confirmResolution = async (req, res) => {
+  const complaint = await complaintService.confirmResolution(req.params.id, req.userId);
+
+  const responseData = complaintResponseSchema.parse(complaint);
+
+  return success(res, responseData, StatusCodes.OK);
+};
