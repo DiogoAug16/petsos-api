@@ -49,12 +49,19 @@ const checkAndApplyAutoResolveByValidationCount = async (complaint, complaintId)
   return { autoResolved: false };
 };
 
+const isVotingEnabled = (complaint) => {
+  return (
+    complaint.status === COMPLAINT_STATUS.AWAITING_VALIDATION &&
+    (Boolean(complaint.validationRequestedAt) || isOwnerInactive(complaint))
+  );
+};
+
 export const vote = async ({ complaintId, userId, approved }) => {
   const complaint = await complaintRepository.getDetail(complaintId);
 
-  if (complaint.status !== COMPLAINT_STATUS.AWAITING_VALIDATION) {
+  if (!isVotingEnabled(complaint)) {
     throw new ValidationError(
-      "Votação só é permitida em denúncias aguardando validação",
+      `Votação só é permitida após abertura por voluntário ou ${OWNER_RESPONSE_DAYS} dias sem resposta do criador`,
       ERROR_CODES.COMPLAINT_INVALID_STATUS_TRANSITION,
     );
   }
@@ -62,13 +69,6 @@ export const vote = async ({ complaintId, userId, approved }) => {
   if (complaint.createdById === userId) {
     throw new ForbiddenError(
       "O criador da denúncia deve usar a validação direta, não a votação",
-    );
-  }
-
-  if (!isOwnerInactive(complaint)) {
-    throw new ValidationError(
-      `Votação só é liberada após ${OWNER_RESPONSE_DAYS} dias sem resposta do criador`,
-      ERROR_CODES.COMPLAINT_VALIDATION,
     );
   }
 
@@ -161,9 +161,7 @@ export const getStatus = async (complaintId, userId) => {
   const eligibleVoters = new Set([...followerIds, ...volunteerIds]);
   eligibleVoters.delete(complaint.createdById);
 
-  const votingEnabled =
-    complaint.status === COMPLAINT_STATUS.AWAITING_VALIDATION &&
-    isOwnerInactive(complaint);
+  const votingEnabled = isVotingEnabled(complaint);
 
   return {
     complaintId,

@@ -4,6 +4,7 @@ import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
 import { serialize } from "../../shared/utils/firestore.util.js";
 import { distanceBetween } from "geofire-common";
+import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
 
 const COLLECTION = `${env.firebase.collectionPrefix}complaints`;
 
@@ -91,6 +92,65 @@ export const setStatusWithMetadata = async (
   return serialize(id, updated);
 };
 
+export const requestValidation = async (id, { requestedBy, reasonType, reasonText }) => {
+  const docRef = db.collection(COLLECTION).doc(id);
+  const doc = await docRef.get();
+  if (!doc.exists) throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+
+  await docRef.update({
+    status: COMPLAINT_STATUS.AWAITING_VALIDATION,
+    validationRequestedAt: new Date(),
+    validationRequestedBy: requestedBy,
+    validationRequestReasonType: reasonType,
+    validationRequestReasonText: reasonText,
+    statusUpdatedAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  const updated = (await docRef.get()).data();
+
+  return serialize(id, updated);
+};
+
+export const requestValidationIfUnrequested = async (
+  id,
+  { requestedBy, reasonType, reasonText },
+) => {
+  const docRef = db.collection(COLLECTION).doc(id);
+
+  return await db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(docRef);
+    if (!doc.exists) throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+
+    const data = doc.data();
+    if (
+      data.validationRequestedAt ||
+      data.status !== COMPLAINT_STATUS.AWAITING_VALIDATION
+    ) {
+      return {
+        opened: false,
+        complaint: serialize(doc.id, data),
+      };
+    }
+
+    const update = {
+      validationRequestedAt: new Date(),
+      validationRequestedBy: requestedBy,
+      validationRequestReasonType: reasonType,
+      validationRequestReasonText: reasonText,
+      statusUpdatedAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    transaction.update(docRef, update);
+
+    return {
+      opened: true,
+      complaint: serialize(doc.id, { ...data, ...update }),
+    };
+  });
+};
+
 export const deleteComplaint = async (id) => {
   await db.collection(COLLECTION).doc(id).delete();
 };
@@ -140,4 +200,22 @@ export const findNearestWithinRadius = async (lat, lng, radiusKm) => {
   results.sort((a, b) => a.distanceKm - b.distanceKm);
 
   return results;
+};
+
+export const confirmResolution = async (id) => {
+  const docRef = db.collection(COLLECTION).doc(id);
+  const doc = await docRef.get();
+
+  if (!doc.exists) throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+
+  await docRef.update({
+    status: COMPLAINT_STATUS.RESOLVED,
+    resolvedAt: new Date(),
+    resolvedBy: "author",
+    updatedAt: new Date(),
+  });
+
+  const updatedDoc = await docRef.get();
+
+  return serialize(updatedDoc.id, updatedDoc.data());
 };
