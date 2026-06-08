@@ -1,0 +1,12 @@
+services:
+  backend:
+    image: backend
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      NODE_ENV: production
+    ports:
+      - 3030:3030
+      - 9229:9229
+    command: ["node", "--inspect=0.0.0.0:9229", "server.js"]
