@@ -11,6 +11,7 @@ import {
   validateUpdateComplaint,
   validateUpdateStatus,
   validateNearestQuery,
+  validateRequestValidation,
 } from "../validators/complaint.validator.js";
 import {
   validateSubmitEvidence,
@@ -79,6 +80,7 @@ router.post(
 router.post(
   "/:id/request-validation",
   authenticateToken,
+  validateRequestValidation,
   wrap(complaintController.requestValidation),
 );
 

@@ -43,6 +43,21 @@ export const nearestQuerySchema = z.object({
   }),
 });
 
+export const VALIDATION_REQUEST_REASON_TYPES = [
+  "already_resolved",
+  "false_report",
+  "needs_community_review",
+  "owner_inactive",
+];
+
+export const MANUAL_VALIDATION_REQUEST_REASON_TYPES =
+  VALIDATION_REQUEST_REASON_TYPES.filter((reasonType) => reasonType !== "owner_inactive");
+
+export const requestValidationSchema = z.object({
+  reasonType: z.enum(MANUAL_VALIDATION_REQUEST_REASON_TYPES),
+  reasonText: z.string().trim().max(500).optional().nullable(),
+});
+
 export const complaintResponseSchema = complaintBaseSchema.extend({
   id: z.string(),
   status: z.enum(VALID_COMPLAINT_STATUS),
@@ -52,6 +67,9 @@ export const complaintResponseSchema = complaintBaseSchema.extend({
   updatedAt: z.any().optional(),
   statusUpdatedAt: z.any().optional(),
   validationRequestedAt: z.any().optional(),
+  validationRequestedBy: z.string().nullable().optional(),
+  validationRequestReasonType: z.enum(VALIDATION_REQUEST_REASON_TYPES).optional(),
+  validationRequestReasonText: z.string().nullable().optional(),
   createdById: z.string().optional(),
   createdByUsername: z.string().nullable().optional(),
 });
