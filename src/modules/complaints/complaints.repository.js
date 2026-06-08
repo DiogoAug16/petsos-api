@@ -63,6 +63,35 @@ export const setStatus = async (id, status) => {
   return serialize(id, updated);
 };
 
+export const setStatusWithMetadata = async (
+  id,
+  status,
+  { resolvedBy, resolvedAt } = {},
+) => {
+  const docRef = db.collection(COLLECTION).doc(id);
+  const doc = await docRef.get();
+  if (!doc.exists) throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+
+  const updateData = {
+    status,
+    statusUpdatedAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  if (resolvedBy) {
+    updateData.resolvedBy = resolvedBy;
+  }
+
+  if (resolvedAt) {
+    updateData.resolvedAt = resolvedAt;
+  }
+
+  await docRef.update(updateData);
+
+  const updated = (await docRef.get()).data();
+  return serialize(id, updated);
+};
+
 export const requestValidation = async (id, { requestedBy, reasonType, reasonText }) => {
   const docRef = db.collection(COLLECTION).doc(id);
   const doc = await docRef.get();
@@ -79,6 +108,7 @@ export const requestValidation = async (id, { requestedBy, reasonType, reasonTex
   });
 
   const updated = (await docRef.get()).data();
+
   return serialize(id, updated);
 };
 
