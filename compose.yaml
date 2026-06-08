@@ -6,6 +6,7 @@ services:
     container_name: backend
     environment:
       NODE_ENV: production
+    restart: always
     env_file:
       - .env
     expose:
