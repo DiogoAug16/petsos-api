@@ -69,7 +69,11 @@ export const confirmResolution = async (req, res) => {
 
 /** @type {import("express").RequestHandler} */
 export const requestValidation = async (req, res) => {
-  const complaint = await complaintService.requestValidation(req.params.id, req.userId);
+  const complaint = await complaintService.requestValidation(
+    req.params.id,
+    req.userId,
+    req.validatedValidationRequestData,
+  );
   const responseData = complaintResponseSchema.parse(complaint);
   return success(res, responseData, StatusCodes.OK);
 };

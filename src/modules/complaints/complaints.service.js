@@ -19,12 +19,13 @@ const VALID_TRANSITIONS = {
   [COMPLAINT_STATUS.RESOLVED]: [],
   [COMPLAINT_STATUS.CLOSED]: [],
 };
-const VALIDATION_REQUEST_RADIUS_KM = 5;
 const VALIDATION_REQUEST_ALLOWED_STATUS = [
   COMPLAINT_STATUS.OPEN,
   COMPLAINT_STATUS.IN_PROGRESS,
   COMPLAINT_STATUS.AWAITING_VALIDATION,
 ];
+const OWNER_RESPONSE_DAYS = 7;
+const OWNER_INACTIVE_REASON_TYPE = "owner_inactive";
 
 export const create = async (complaintData, authenticatedUserId) => {
   const complaintId = complaintRepository.createId();
@@ -60,7 +61,7 @@ export const getAll = async () => {
 };
 
 export const getDetail = async (id) => {
-  const complaint = await complaintRepository.getDetail(id);
+  const complaint = await openValidationByOwnerInactivityIfNeeded(id);
   return await usersService.enrichWithCreatedByUsername(complaint);
 };
 
@@ -145,18 +146,13 @@ const notifyValidationRequestRecipients = async ({
   complaintId,
   actorUserId,
 }) => {
-  const [followerIds, nearbyUsers] = await Promise.all([
+  const [followerIds, volunteerIds] = await Promise.all([
     complaintFollowersRepository.getFollowers(complaintId),
-    usersService.findNearestWithinRadius({
-      lat: complaint.location.latitude,
-      lng: complaint.location.longitude,
-      radiusKm: VALIDATION_REQUEST_RADIUS_KM,
-    }),
+    complaintVolunteersRepository.getVolunteers(complaintId),
   ]);
 
-  const recipientIds = new Set(followerIds);
-  nearbyUsers.forEach((user) => recipientIds.add(user.id));
-  recipientIds.delete(actorUserId);
+  const recipientIds = new Set([...followerIds, ...volunteerIds]);
+  if (actorUserId) recipientIds.delete(actorUserId);
 
   return await Promise.all(
     [...recipientIds].map((recipientId) =>
@@ -171,7 +167,52 @@ const notifyValidationRequestRecipients = async ({
   );
 };
 
-export const requestValidation = async (complaintId, authenticatedUserId) => {
+const isOwnerInactive = (complaint) => {
+  const statusUpdatedAt = complaint.statusUpdatedAt ?? null;
+  if (!statusUpdatedAt) return false;
+
+  const statusUpdatedAtDate = new Date(statusUpdatedAt);
+  if (Number.isNaN(statusUpdatedAtDate.getTime())) return false;
+
+  const daysSinceUpdate =
+    (Date.now() - statusUpdatedAtDate.getTime()) / (1000 * 60 * 60 * 24);
+
+  return daysSinceUpdate >= OWNER_RESPONSE_DAYS;
+};
+
+const openValidationByOwnerInactivityIfNeeded = async (complaintId) => {
+  const complaint = await complaintRepository.getDetail(complaintId);
+
+  if (
+    complaint.status !== COMPLAINT_STATUS.AWAITING_VALIDATION ||
+    complaint.validationRequestedAt ||
+    !isOwnerInactive(complaint)
+  ) {
+    return complaint;
+  }
+
+  const result = await complaintRepository.requestValidationIfUnrequested(complaintId, {
+    requestedBy: null,
+    reasonType: OWNER_INACTIVE_REASON_TYPE,
+    reasonText: null,
+  });
+
+  if (result.opened) {
+    await notifyValidationRequestRecipients({
+      complaint: result.complaint,
+      complaintId,
+      actorUserId: null,
+    });
+  }
+
+  return result.complaint;
+};
+
+export const requestValidation = async (
+  complaintId,
+  authenticatedUserId,
+  { reasonType, reasonText },
+) => {
   const complaint = await complaintRepository.getDetail(complaintId);
 
   const isVolunteer = await complaintVolunteersRepository.isVolunteer(
@@ -189,7 +230,9 @@ export const requestValidation = async (complaintId, authenticatedUserId) => {
     throw new ValidationError(
       {
         fieldErrors: {
-          status: ["Apenas denúncias abertas ou em andamento podem abrir votação."],
+          status: [
+            "Apenas denúncias abertas, em andamento ou aguardando validação podem abrir votação.",
+          ],
         },
       },
       ERROR_CODES.COMPLAINT_INVALID_STATUS_TRANSITION,
@@ -200,7 +243,11 @@ export const requestValidation = async (complaintId, authenticatedUserId) => {
     throw new ConflictError("Votação de validação já foi aberta para esta denúncia");
   }
 
-  const updated = await complaintRepository.requestValidation(complaintId);
+  const updated = await complaintRepository.requestValidation(complaintId, {
+    requestedBy: authenticatedUserId,
+    reasonType,
+    reasonText,
+  });
 
   await notifyValidationRequestRecipients({
     complaint,
