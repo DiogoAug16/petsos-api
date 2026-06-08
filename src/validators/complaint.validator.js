@@ -5,6 +5,7 @@ import {
   updateComplaintSchema,
   updateStatusSchema,
   nearestQuerySchema,
+  requestValidationSchema,
 } from "../schemas/complaint.schema.js";
 import { z } from "zod";
 
@@ -57,6 +58,21 @@ export const validateNearestQuery = (req, res, next) => {
   }
 
   req.validatedQuery = result.data.query;
+  next();
+};
+
+export const validateRequestValidation = (req, res, next) => {
+  const result = requestValidationSchema.safeParse(req.body);
+
+  if (!result.success) {
+    const errors = z.flattenError(result.error);
+    throw new ValidationError(errors, ERROR_CODES.COMPLAINT_VALIDATION);
+  }
+
+  req.validatedValidationRequestData = {
+    reasonType: result.data.reasonType,
+    reasonText: result.data.reasonText ?? null,
+  };
   next();
 };
 

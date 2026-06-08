@@ -4,11 +4,13 @@ import { deleteFiles } from "../../shared/helpers/file.helper.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import { ValidationError } from "../../shared/errors/validation.error.js";
+import { ConflictError } from "../../shared/errors/conflict.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
 import * as complaintFollowersRepository from "../complaint-followers/complaint-followers.repository.js";
 import * as usersService from "../users/users.service.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 import * as complaintValidationsRepository from "../complaint-validations/complaint-validations.repository.js";
+import * as complaintVolunteersRepository from "../complaint-volunteers/complaint-volunteers.repository.js";
 
 const VALID_TRANSITIONS = {
   [COMPLAINT_STATUS.OPEN]: [COMPLAINT_STATUS.IN_PROGRESS],
@@ -17,6 +19,13 @@ const VALID_TRANSITIONS = {
   [COMPLAINT_STATUS.RESOLVED]: [],
   [COMPLAINT_STATUS.CLOSED]: [],
 };
+const VALIDATION_REQUEST_ALLOWED_STATUS = [
+  COMPLAINT_STATUS.OPEN,
+  COMPLAINT_STATUS.IN_PROGRESS,
+  COMPLAINT_STATUS.AWAITING_VALIDATION,
+];
+const OWNER_RESPONSE_DAYS = 7;
+const OWNER_INACTIVE_REASON_TYPE = "owner_inactive";
 
 export const create = async (complaintData, authenticatedUserId) => {
   const complaintId = complaintRepository.createId();
@@ -52,7 +61,7 @@ export const getAll = async () => {
 };
 
 export const getDetail = async (id) => {
-  const complaint = await complaintRepository.getDetail(id);
+  const complaint = await openValidationByOwnerInactivityIfNeeded(id);
   return await usersService.enrichWithCreatedByUsername(complaint);
 };
 
@@ -130,6 +139,123 @@ export const findNearestWithinRadius = async ({ lat, lng, radiusKm }) => {
     radiusKm,
   );
   return await usersService.enrichWithCreatedByUsernames(complaints);
+};
+
+const notifyValidationRequestRecipients = async ({
+  complaint,
+  complaintId,
+  actorUserId,
+}) => {
+  const [followerIds, volunteerIds] = await Promise.all([
+    complaintFollowersRepository.getFollowers(complaintId),
+    complaintVolunteersRepository.getVolunteers(complaintId),
+  ]);
+
+  const recipientIds = new Set([...followerIds, ...volunteerIds]);
+  if (actorUserId) recipientIds.delete(actorUserId);
+
+  return await Promise.all(
+    [...recipientIds].map((recipientId) =>
+      notificationsService.createNotification({
+        userId: recipientId,
+        complaintId,
+        type: "validation_request",
+        message: `A denúncia "${complaint.title}" precisa de validação.`,
+        sendPush: true,
+      }),
+    ),
+  );
+};
+
+const isOwnerInactive = (complaint) => {
+  const statusUpdatedAt = complaint.statusUpdatedAt ?? null;
+  if (!statusUpdatedAt) return false;
+
+  const statusUpdatedAtDate = new Date(statusUpdatedAt);
+  if (Number.isNaN(statusUpdatedAtDate.getTime())) return false;
+
+  const daysSinceUpdate =
+    (Date.now() - statusUpdatedAtDate.getTime()) / (1000 * 60 * 60 * 24);
+
+  return daysSinceUpdate >= OWNER_RESPONSE_DAYS;
+};
+
+const openValidationByOwnerInactivityIfNeeded = async (complaintId) => {
+  const complaint = await complaintRepository.getDetail(complaintId);
+
+  if (
+    complaint.status !== COMPLAINT_STATUS.AWAITING_VALIDATION ||
+    complaint.validationRequestedAt ||
+    !isOwnerInactive(complaint)
+  ) {
+    return complaint;
+  }
+
+  const result = await complaintRepository.requestValidationIfUnrequested(complaintId, {
+    requestedBy: null,
+    reasonType: OWNER_INACTIVE_REASON_TYPE,
+    reasonText: null,
+  });
+
+  if (result.opened) {
+    await notifyValidationRequestRecipients({
+      complaint: result.complaint,
+      complaintId,
+      actorUserId: null,
+    });
+  }
+
+  return result.complaint;
+};
+
+export const requestValidation = async (
+  complaintId,
+  authenticatedUserId,
+  { reasonType, reasonText },
+) => {
+  const complaint = await complaintRepository.getDetail(complaintId);
+
+  const isVolunteer = await complaintVolunteersRepository.isVolunteer(
+    complaintId,
+    authenticatedUserId,
+  );
+
+  if (!isVolunteer) {
+    throw new ForbiddenError(
+      "Apenas voluntários vinculados podem abrir votação de validação.",
+    );
+  }
+
+  if (!VALIDATION_REQUEST_ALLOWED_STATUS.includes(complaint.status)) {
+    throw new ValidationError(
+      {
+        fieldErrors: {
+          status: [
+            "Apenas denúncias abertas, em andamento ou aguardando validação podem abrir votação.",
+          ],
+        },
+      },
+      ERROR_CODES.COMPLAINT_INVALID_STATUS_TRANSITION,
+    );
+  }
+
+  if (complaint.validationRequestedAt) {
+    throw new ConflictError("Votação de validação já foi aberta para esta denúncia");
+  }
+
+  const updated = await complaintRepository.requestValidation(complaintId, {
+    requestedBy: authenticatedUserId,
+    reasonType,
+    reasonText,
+  });
+
+  await notifyValidationRequestRecipients({
+    complaint,
+    complaintId,
+    actorUserId: authenticatedUserId,
+  });
+
+  return await usersService.enrichWithCreatedByUsername(updated);
 };
 
 export const getFollowedByUsername = async (username) => {

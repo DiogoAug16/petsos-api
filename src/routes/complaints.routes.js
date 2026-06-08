@@ -11,8 +11,12 @@ import {
   validateUpdateComplaint,
   validateUpdateStatus,
   validateNearestQuery,
+  validateRequestValidation,
 } from "../validators/complaint.validator.js";
-import { validateSubmitEvidence } from "../validators/complaint-evidence.validator.js";
+import {
+  validateSubmitEvidence,
+  validateEvidence,
+} from "../validators/complaint-evidence.validator.js";
 import { validateVote } from "../validators/complaint-votes.validator.js";
 import { authenticateToken } from "../shared/middlewares/auth.middleware.js";
 
@@ -50,6 +54,7 @@ router.get("/:id/evidences", wrap(complaintEvidenceController.getByComplaintId))
 router.post(
   "/:id/evidences/validate",
   authenticateToken,
+  validateEvidence,
   wrap(complaintEvidenceController.validateEvidence),
 );
 
@@ -70,6 +75,13 @@ router.post(
   "/:id/confirm-resolution",
   authenticateToken,
   wrap(complaintController.confirmResolution),
+);
+
+router.post(
+  "/:id/request-validation",
+  authenticateToken,
+  validateRequestValidation,
+  wrap(complaintController.requestValidation),
 );
 
 router.get("/:id", wrap(complaintController.getDetail));
