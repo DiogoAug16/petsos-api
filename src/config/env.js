@@ -12,7 +12,7 @@ export const env = {
   },
   complaints: {
     minValidationsAutoResolve: parseInt(
-      process.env.MIN_VALIDATIONS_AUTO_RESOLVE || "5",
+      process.env.MIN_VALIDATIONS_AUTO_RESOLVE || "1",
       10,
     ),
   },
