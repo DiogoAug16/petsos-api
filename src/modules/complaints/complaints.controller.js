@@ -63,8 +63,13 @@ export const getNearest = async (req, res) => {
 /** @type {import("express").RequestHandler} */
 export const confirmResolution = async (req, res) => {
   const complaint = await complaintService.confirmResolution(req.params.id, req.userId);
-
   const responseData = complaintResponseSchema.parse(complaint);
+  return success(res, responseData, StatusCodes.OK);
+};
 
+/** @type {import("express").RequestHandler} */
+export const requestValidation = async (req, res) => {
+  const complaint = await complaintService.requestValidation(req.params.id, req.userId);
+  const responseData = complaintResponseSchema.parse(complaint);
   return success(res, responseData, StatusCodes.OK);
 };

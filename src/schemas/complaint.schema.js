@@ -51,6 +51,7 @@ export const complaintResponseSchema = complaintBaseSchema.extend({
   createdAt: z.any().optional(),
   updatedAt: z.any().optional(),
   statusUpdatedAt: z.any().optional(),
+  validationRequestedAt: z.any().optional(),
   createdById: z.string().optional(),
   createdByUsername: z.string().nullable().optional(),
 });

@@ -35,6 +35,7 @@ export const createNotification = async ({
     new_comment: preferences.comments,
     comment_group: preferences.comments,
     comment_reply: preferences.comments,
+    validation_request: preferences.statusChanges,
   };
 
   const isEnabled = typeMap[type];
