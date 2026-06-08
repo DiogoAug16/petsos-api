@@ -4,11 +4,13 @@ import { deleteFiles } from "../../shared/helpers/file.helper.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import { ValidationError } from "../../shared/errors/validation.error.js";
+import { ConflictError } from "../../shared/errors/conflict.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
 import * as complaintFollowersRepository from "../complaint-followers/complaint-followers.repository.js";
 import * as usersService from "../users/users.service.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 import * as complaintValidationsRepository from "../complaint-validations/complaint-validations.repository.js";
+import * as complaintVolunteersRepository from "../complaint-volunteers/complaint-volunteers.repository.js";
 
 const VALID_TRANSITIONS = {
   [COMPLAINT_STATUS.OPEN]: [COMPLAINT_STATUS.IN_PROGRESS],
@@ -17,6 +19,12 @@ const VALID_TRANSITIONS = {
   [COMPLAINT_STATUS.RESOLVED]: [],
   [COMPLAINT_STATUS.CLOSED]: [],
 };
+const VALIDATION_REQUEST_RADIUS_KM = 5;
+const VALIDATION_REQUEST_ALLOWED_STATUS = [
+  COMPLAINT_STATUS.OPEN,
+  COMPLAINT_STATUS.IN_PROGRESS,
+  COMPLAINT_STATUS.AWAITING_VALIDATION,
+];
 
 export const create = async (complaintData, authenticatedUserId) => {
   const complaintId = complaintRepository.createId();
@@ -130,6 +138,77 @@ export const findNearestWithinRadius = async ({ lat, lng, radiusKm }) => {
     radiusKm,
   );
   return await usersService.enrichWithCreatedByUsernames(complaints);
+};
+
+const notifyValidationRequestRecipients = async ({
+  complaint,
+  complaintId,
+  actorUserId,
+}) => {
+  const [followerIds, nearbyUsers] = await Promise.all([
+    complaintFollowersRepository.getFollowers(complaintId),
+    usersService.findNearestWithinRadius({
+      lat: complaint.location.latitude,
+      lng: complaint.location.longitude,
+      radiusKm: VALIDATION_REQUEST_RADIUS_KM,
+    }),
+  ]);
+
+  const recipientIds = new Set(followerIds);
+  nearbyUsers.forEach((user) => recipientIds.add(user.id));
+  recipientIds.delete(actorUserId);
+
+  return await Promise.all(
+    [...recipientIds].map((recipientId) =>
+      notificationsService.createNotification({
+        userId: recipientId,
+        complaintId,
+        type: "validation_request",
+        message: `A denúncia "${complaint.title}" precisa de validação.`,
+        sendPush: true,
+      }),
+    ),
+  );
+};
+
+export const requestValidation = async (complaintId, authenticatedUserId) => {
+  const complaint = await complaintRepository.getDetail(complaintId);
+
+  const isVolunteer = await complaintVolunteersRepository.isVolunteer(
+    complaintId,
+    authenticatedUserId,
+  );
+
+  if (!isVolunteer) {
+    throw new ForbiddenError(
+      "Apenas voluntários vinculados podem abrir votação de validação.",
+    );
+  }
+
+  if (!VALIDATION_REQUEST_ALLOWED_STATUS.includes(complaint.status)) {
+    throw new ValidationError(
+      {
+        fieldErrors: {
+          status: ["Apenas denúncias abertas ou em andamento podem abrir votação."],
+        },
+      },
+      ERROR_CODES.COMPLAINT_INVALID_STATUS_TRANSITION,
+    );
+  }
+
+  if (complaint.validationRequestedAt) {
+    throw new ConflictError("Votação de validação já foi aberta para esta denúncia");
+  }
+
+  const updated = await complaintRepository.requestValidation(complaintId);
+
+  await notifyValidationRequestRecipients({
+    complaint,
+    complaintId,
+    actorUserId: authenticatedUserId,
+  });
+
+  return await usersService.enrichWithCreatedByUsername(updated);
 };
 
 export const getFollowedByUsername = async (username) => {
