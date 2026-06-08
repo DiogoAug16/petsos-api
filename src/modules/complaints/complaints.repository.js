@@ -4,6 +4,7 @@ import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
 import { serialize } from "../../shared/utils/firestore.util.js";
 import { distanceBetween } from "geofire-common";
+import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
 
 const COLLECTION = `${env.firebase.collectionPrefix}complaints`;
 
@@ -111,4 +112,22 @@ export const findNearestWithinRadius = async (lat, lng, radiusKm) => {
   results.sort((a, b) => a.distanceKm - b.distanceKm);
 
   return results;
+};
+
+export const confirmResolution = async (id) => {
+  const docRef = db.collection(COLLECTION).doc(id);
+  const doc = await docRef.get();
+
+  if (!doc.exists) throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+
+  await docRef.update({
+    status: COMPLAINT_STATUS.RESOLVED,
+    resolvedAt: new Date(),
+    resolvedBy: "author",
+    updatedAt: new Date(),
+  });
+
+  const updatedDoc = await docRef.get();
+
+  return serialize(updatedDoc.id, updatedDoc.data());
 };

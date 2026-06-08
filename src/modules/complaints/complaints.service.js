@@ -8,6 +8,7 @@ import { ERROR_CODES } from "../../shared/types/error.codes.js";
 import * as complaintFollowersRepository from "../complaint-followers/complaint-followers.repository.js";
 import * as usersService from "../users/users.service.js";
 import * as notificationsService from "../notifications/notifications.service.js";
+import * as complaintValidationsRepository from "../complaint-validations/complaint-validations.repository.js";
 
 const VALID_TRANSITIONS = {
   [COMPLAINT_STATUS.OPEN]: [COMPLAINT_STATUS.IN_PROGRESS],
@@ -143,4 +144,44 @@ export const getFollowedByUsername = async (username) => {
   if (complaintIds.length === 0) return [];
 
   return await complaintRepository.getByIds(complaintIds);
+};
+
+const MIN_VALIDATIONS_TO_CONFIRM_RESOLUTION = 3;
+
+export const confirmResolution = async (complaintId, authenticatedUserId) => {
+  const complaint = await complaintRepository.getDetail(complaintId);
+
+  if (complaint.createdById !== authenticatedUserId) {
+    throw new ForbiddenError("Apenas o autor pode confirmar a resolução.");
+  }
+
+  if (complaint.status !== COMPLAINT_STATUS.AWAITING_VALIDATION) {
+    throw new ValidationError(
+      { fieldErrors: {} },
+      ERROR_CODES.VALIDATION_ERROR,
+      "A denúncia precisa estar aguardando validação.",
+    );
+  }
+
+  const { count } = await complaintValidationsRepository.countByComplaintId(complaintId);
+
+  if (count < MIN_VALIDATIONS_TO_CONFIRM_RESOLUTION) {
+    throw new ValidationError(
+      { fieldErrors: {} },
+      ERROR_CODES.VALIDATION_ERROR,
+      "Validações insuficientes para confirmar resolução.",
+    );
+  }
+
+  const updated = await complaintRepository.confirmResolution(complaintId);
+
+  await notificationsService.notifyComplaintFollowers({
+    complaintId,
+    actorUserId: authenticatedUserId,
+    type: "complaint_resolved",
+    message: `A denúncia "${complaint.title}" foi marcada como resolvida pelo autor.`,
+    sendPush: false,
+  });
+
+  return await usersService.enrichWithCreatedByUsername(updated);
 };
