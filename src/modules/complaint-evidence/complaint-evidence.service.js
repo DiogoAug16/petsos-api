@@ -11,12 +11,13 @@ import { ERROR_CODES } from "../../shared/types/error.codes.js";
 export const submitEvidence = async (complaintId, userId, { description, photos }) => {
   const complaint = await complaintRepository.getDetail(complaintId);
 
+  const isAuthor = complaint.createdById === userId;
   const isVolunteer = await complaintVolunteersRepository.isVolunteer(
     complaintId,
     userId,
   );
-  if (!isVolunteer) {
-    throw new ForbiddenError("Apenas voluntários podem enviar evidências");
+  if (!isAuthor && !isVolunteer) {
+    throw new ForbiddenError("Apenas o autor ou voluntários podem enviar evidências");
   }
 
   if (complaint.status !== COMPLAINT_STATUS.IN_PROGRESS) {
@@ -81,6 +82,24 @@ export const validateEvidence = async (
 
   if (!evidenceIds || evidenceIds.length === 0) {
     throw new ValidationError("Selecione ao menos uma evidência para validar");
+  }
+
+  const complaintEvidences =
+    await complaintEvidenceRepository.getByComplaintId(complaintId);
+  const complaintEvidenceIds = new Set(complaintEvidences.map((evidence) => evidence.id));
+  const invalidEvidenceIds = evidenceIds.filter((id) => !complaintEvidenceIds.has(id));
+
+  if (invalidEvidenceIds.length > 0) {
+    throw new ValidationError(
+      {
+        fieldErrors: {
+          evidenceIds: [
+            "Uma ou mais evidências não foram encontradas para esta denúncia",
+          ],
+        },
+      },
+      ERROR_CODES.COMPLAINT_VALIDATION,
+    );
   }
 
   if (approved) {
