@@ -10,9 +10,13 @@ import { ValidationError } from "../../shared/errors/validation.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
 
 const VOTING_QUORUM_PERCENTAGE = 0.25;
-const APPROVAL_RATE_REQUIRED = 0.7;
-const REJECTION_RATE_REQUIRED = 0.7;
 const OWNER_RESPONSE_DAYS = 7;
+
+const getRequiredRate = (totalEligible) => {
+  if (totalEligible <= 3) return 0.6;
+  if (totalEligible <= 6) return 0.65;
+  return 0.7;
+};
 
 const isOwnerInactive = (complaint) => {
   const statusUpdatedAt =
@@ -46,18 +50,19 @@ const getEligibleVoters = async (complaintId, authorId) => {
 
 const getVotingProgress = (counts, totalEligible) => {
   const quorumRequired = Math.ceil(totalEligible * VOTING_QUORUM_PERCENTAGE);
+  const requiredRate = getRequiredRate(totalEligible);
   const approvalRate = counts.total === 0 ? 0 : counts.approved / counts.total;
   const rejectionRate = counts.total === 0 ? 0 : counts.rejected / counts.total;
   const quorumReached = counts.total >= quorumRequired;
-  const approvalRateReached = approvalRate >= APPROVAL_RATE_REQUIRED;
-  const rejectionRateReached = rejectionRate >= REJECTION_RATE_REQUIRED;
+  const approvalRateReached = approvalRate >= requiredRate;
+  const rejectionRateReached = rejectionRate >= requiredRate;
 
   return {
     quorumRequired,
     approvalRate,
     rejectionRate,
-    approvalRateRequired: APPROVAL_RATE_REQUIRED,
-    rejectionRateRequired: REJECTION_RATE_REQUIRED,
+    approvalRateRequired: requiredRate,
+    rejectionRateRequired: requiredRate,
     quorumReached,
     approvalRateReached,
     rejectionRateReached,
@@ -278,7 +283,9 @@ export const voteEvidenceSelection = async ({ complaintId, userId, evidenceIds }
     selectionCounts.topEvidences.length > 0
   ) {
     const topEvidenceIds = selectionCounts.topEvidences
-      .filter((e) => e.votes / selectionCounts.totalVoters >= APPROVAL_RATE_REQUIRED)
+      .filter(
+        (e) => e.votes / selectionCounts.totalVoters >= getRequiredRate(totalEligible),
+      )
       .map((e) => e.evidenceId);
 
     if (topEvidenceIds.length > 0) {
