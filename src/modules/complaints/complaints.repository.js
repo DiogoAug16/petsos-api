@@ -1,4 +1,4 @@
-import { db, GeoPoint } from "../../config/firebase.js";
+import { db, GeoPoint, FieldValue } from "../../config/firebase.js";
 import { env } from "../../config/env.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
@@ -63,11 +63,7 @@ export const setStatus = async (id, status) => {
   return serialize(id, updated);
 };
 
-export const setStatusWithMetadata = async (
-  id,
-  status,
-  { resolvedBy, resolvedAt } = {},
-) => {
+export const setStatusWithMetadata = async (id, status, metadata = {}) => {
   const docRef = db.collection(COLLECTION).doc(id);
   const doc = await docRef.get();
   if (!doc.exists) throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
@@ -78,12 +74,8 @@ export const setStatusWithMetadata = async (
     updatedAt: new Date(),
   };
 
-  if (resolvedBy) {
-    updateData.resolvedBy = resolvedBy;
-  }
-
-  if (resolvedAt) {
-    updateData.resolvedAt = resolvedAt;
+  for (const [key, value] of Object.entries(metadata)) {
+    updateData[key] = value === null ? FieldValue.delete() : value;
   }
 
   await docRef.update(updateData);
@@ -92,12 +84,15 @@ export const setStatusWithMetadata = async (
   return serialize(id, updated);
 };
 
-export const requestValidation = async (id, { requestedBy, reasonType, reasonText }) => {
+export const requestValidation = async (
+  id,
+  { requestedBy, reasonType, reasonText, evidenceIds },
+) => {
   const docRef = db.collection(COLLECTION).doc(id);
   const doc = await docRef.get();
   if (!doc.exists) throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
 
-  await docRef.update({
+  const updateData = {
     status: COMPLAINT_STATUS.AWAITING_VALIDATION,
     validationRequestedAt: new Date(),
     validationRequestedBy: requestedBy,
@@ -105,7 +100,13 @@ export const requestValidation = async (id, { requestedBy, reasonType, reasonTex
     validationRequestReasonText: reasonText,
     statusUpdatedAt: new Date(),
     updatedAt: new Date(),
-  });
+  };
+
+  if (evidenceIds && evidenceIds.length > 0) {
+    updateData.proposedEvidenceIds = evidenceIds;
+  }
+
+  await docRef.update(updateData);
 
   const updated = (await docRef.get()).data();
 

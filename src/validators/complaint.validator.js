@@ -72,6 +72,7 @@ export const validateRequestValidation = (req, res, next) => {
   req.validatedValidationRequestData = {
     reasonType: result.data.reasonType,
     reasonText: result.data.reasonText ?? null,
+    evidenceIds: result.data.evidenceIds ?? null,
   };
   next();
 };

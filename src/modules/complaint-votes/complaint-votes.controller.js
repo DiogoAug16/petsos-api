@@ -17,3 +17,22 @@ export const getStatus = async (req, res) => {
 
   return success(res, result, StatusCodes.OK);
 };
+
+export const voteEvidenceSelection = async (req, res) => {
+  const result = await complaintVotesService.voteEvidenceSelection({
+    complaintId: req.params.id,
+    userId: req.userId,
+    evidenceIds: req.body.evidenceIds,
+  });
+
+  return success(res, result, StatusCodes.CREATED);
+};
+
+export const getEvidenceSelectionStatus = async (req, res) => {
+  const result = await complaintVotesService.getEvidenceSelectionStatus(
+    req.params.id,
+    req.userId || null,
+  );
+
+  return success(res, result, StatusCodes.OK);
+};

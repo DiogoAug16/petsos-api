@@ -32,6 +32,8 @@ export const createNotification = async ({
     complaint_update: preferences.updates,
     status_change: preferences.statusChanges,
     complaint_resolved: preferences.statusChanges,
+    complaint_resolved_community: preferences.statusChanges,
+    complaint_rejected_community: preferences.statusChanges,
     new_comment: preferences.comments,
     comment_group: preferences.comments,
     comment_reply: preferences.comments,

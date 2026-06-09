@@ -17,6 +17,7 @@ function initFirebase() {
     return {
       db: admin.firestore(),
       GeoPoint: admin.firestore.GeoPoint,
+      FieldValue: admin.firestore.FieldValue,
     };
   } catch (error) {
     logger.fatal({ error: error.message }, "Falha ao conectar com Firebase");
@@ -24,4 +25,4 @@ function initFirebase() {
   }
 }
 
-export const { db, GeoPoint } = initFirebase();
+export const { db, GeoPoint, FieldValue } = initFirebase();
