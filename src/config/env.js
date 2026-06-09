@@ -10,10 +10,4 @@ export const env = {
     privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
   },
-  complaints: {
-    minValidationsAutoResolve: parseInt(
-      process.env.MIN_VALIDATIONS_AUTO_RESOLVE || "1",
-      10,
-    ),
-  },
 };
