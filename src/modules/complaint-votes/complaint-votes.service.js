@@ -107,6 +107,9 @@ export const vote = async ({ complaintId, userId, approved }) => {
 
   const isEvidenceSelection =
     complaint.validationRequestReasonType === "evidence_selection";
+  const isClosingReason = ["already_resolved", "false_report"].includes(
+    complaint.validationRequestReasonType,
+  );
 
   if (votingProgress.canResolve) {
     if (isEvidenceSelection && complaint.proposedEvidenceIds?.length > 0) {
@@ -116,36 +119,57 @@ export const vote = async ({ complaintId, userId, approved }) => {
       );
     }
 
-    await complaintRepository.setStatusWithMetadata(
-      complaintId,
-      COMPLAINT_STATUS.RESOLVED,
-      {
-        resolvedBy: isEvidenceSelection ? "community_evidence_vote" : "community",
-        resolvedAt: new Date(),
-        validationCount: counts.approved,
-        selectedEvidenceIds: isEvidenceSelection ? complaint.proposedEvidenceIds : null,
-      },
-    );
+    const targetStatus = isClosingReason
+      ? COMPLAINT_STATUS.CLOSED
+      : COMPLAINT_STATUS.RESOLVED;
+
+    const metadata = isClosingReason
+      ? {
+          closedBy: "community",
+          closedAt: new Date(),
+          validationCount: counts.approved,
+        }
+      : {
+          resolvedBy: isEvidenceSelection ? "community_evidence_vote" : "community",
+          resolvedAt: new Date(),
+          validationCount: counts.approved,
+          selectedEvidenceIds: isEvidenceSelection ? complaint.proposedEvidenceIds : null,
+        };
+
+    await complaintRepository.setStatusWithMetadata(complaintId, targetStatus, metadata);
+
+    const notificationType = isClosingReason
+      ? "complaint_closed_community"
+      : "complaint_resolved_community";
+    const authorMessage = isClosingReason
+      ? `Sua denúncia "${complaint.title}" foi fechada pela comunidade com ${counts.approved} voto(s).`
+      : `Sua denúncia "${complaint.title}" foi confirmada pela comunidade com ${counts.approved} validação(ões).`;
+    const followersMessage = isClosingReason
+      ? `A denúncia "${complaint.title}" foi fechada por votação da comunidade (${counts.approved} votos).`
+      : `A denúncia "${complaint.title}" foi resolvida por votação da comunidade (${counts.approved} validações).`;
 
     await notificationsService.createNotification({
       userId: complaint.createdById,
       complaintId,
-      type: "complaint_resolved_community",
-      message: `Sua denúncia "${complaint.title}" foi confirmada pela comunidade com ${counts.approved} validação(ões).`,
+      type: notificationType,
+      message: authorMessage,
       sendPush: true,
     });
 
     await notificationsService.notifyComplaintFollowers({
       complaintId,
       actorUserId: complaint.createdById,
-      type: "complaint_resolved_community",
-      message: `A denúncia "${complaint.title}" foi resolvida por votação da comunidade (${counts.approved} validações).`,
+      type: notificationType,
+      message: followersMessage,
       sendPush: false,
     });
 
     return {
-      message: "Voto registrado. Denúncia resolvida por votação da comunidade.",
-      resolved: true,
+      message: isClosingReason
+        ? "Voto registrado. Denúncia fechada por votação da comunidade."
+        : "Voto registrado. Denúncia resolvida por votação da comunidade.",
+      resolved: !isClosingReason,
+      closed: isClosingReason,
       votes: counts,
       totalEligible,
       reason: isEvidenceSelection
