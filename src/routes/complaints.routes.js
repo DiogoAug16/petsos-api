@@ -72,6 +72,18 @@ router.get(
 );
 
 router.post(
+  "/:id/votes/evidence-selection",
+  authenticateToken,
+  wrap(complaintVotesController.voteEvidenceSelection),
+);
+
+router.get(
+  "/:id/votes/evidence-selection/status",
+  authenticateToken,
+  wrap(complaintVotesController.getEvidenceSelectionStatus),
+);
+
+router.post(
   "/:id/confirm-resolution",
   authenticateToken,
   wrap(complaintController.confirmResolution),

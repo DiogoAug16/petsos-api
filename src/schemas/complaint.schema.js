@@ -47,6 +47,7 @@ export const VALIDATION_REQUEST_REASON_TYPES = [
   "already_resolved",
   "false_report",
   "needs_community_review",
+  "evidence_selection",
   "owner_inactive",
 ];
 
@@ -56,6 +57,7 @@ export const MANUAL_VALIDATION_REQUEST_REASON_TYPES =
 export const requestValidationSchema = z.object({
   reasonType: z.enum(MANUAL_VALIDATION_REQUEST_REASON_TYPES),
   reasonText: z.string().trim().max(500).optional().nullable(),
+  evidenceIds: z.array(z.string()).optional().nullable(),
 });
 
 export const complaintResponseSchema = complaintBaseSchema.extend({
@@ -72,6 +74,13 @@ export const complaintResponseSchema = complaintBaseSchema.extend({
   validationRequestReasonText: z.string().nullable().optional(),
   createdById: z.string().optional(),
   createdByUsername: z.string().nullable().optional(),
+  resolvedBy: z.string().nullable().optional(),
+  resolvedAt: z.any().optional(),
+  closedBy: z.string().nullable().optional(),
+  closedAt: z.any().optional(),
+  rejectionExpiresAt: z.any().optional(),
+  rejectionCount: z.number().nullable().optional(),
+  proposedEvidenceIds: z.array(z.string()).nullable().optional(),
 });
 
 export const updateStatusSchema = z.object({

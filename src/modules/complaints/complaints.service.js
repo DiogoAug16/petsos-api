@@ -211,7 +211,7 @@ const openValidationByOwnerInactivityIfNeeded = async (complaintId) => {
 export const requestValidation = async (
   complaintId,
   authenticatedUserId,
-  { reasonType, reasonText },
+  { reasonType, reasonText, evidenceIds },
 ) => {
   const complaint = await complaintRepository.getDetail(complaintId);
 
@@ -243,10 +243,19 @@ export const requestValidation = async (
     throw new ConflictError("Votação de validação já foi aberta para esta denúncia");
   }
 
+  if (reasonType === "evidence_selection") {
+    if (!evidenceIds || evidenceIds.length === 0) {
+      throw new ValidationError(
+        "Selecione ao menos uma evidência para propor à comunidade",
+      );
+    }
+  }
+
   const updated = await complaintRepository.requestValidation(complaintId, {
     requestedBy: authenticatedUserId,
     reasonType,
     reasonText,
+    evidenceIds: reasonType === "evidence_selection" ? evidenceIds : null,
   });
 
   await notifyValidationRequestRecipients({
