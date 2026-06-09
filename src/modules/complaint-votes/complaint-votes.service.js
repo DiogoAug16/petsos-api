@@ -193,16 +193,17 @@ export const vote = async ({ complaintId, userId, approved }) => {
     const rejectedAt = new Date();
     const rejectionExpiresAt = new Date(rejectedAt.getTime() + 48 * 60 * 60 * 1000);
 
-    await complaintRepository.setStatusWithMetadata(
-      complaintId,
-      COMPLAINT_STATUS.CLOSED,
-      {
-        closedBy: "community",
-        closedAt: rejectedAt,
-        rejectionCount: counts.rejected,
-        rejectionExpiresAt,
-      },
-    );
+    await complaintVotesRepository.clearVotesByComplaintId(complaintId);
+    await complaintRepository.setStatusWithMetadata(complaintId, complaint.status, {
+      rejectedBy: "community",
+      rejectedAt,
+      rejectionCount: counts.rejected,
+      rejectionExpiresAt,
+      validationRequestedAt: null,
+      validationRequestedBy: null,
+      validationRequestReasonType: null,
+      validationRequestReasonText: null,
+    });
 
     await notificationsService.createNotification({
       userId: complaint.createdById,
@@ -364,8 +365,8 @@ export const getEvidenceSelectionStatus = async (complaintId, userId) => {
 
 const checkAndClearExpiredRejection = async (complaint, complaintId) => {
   if (
-    complaint.status !== COMPLAINT_STATUS.CLOSED ||
-    complaint.closedBy !== "community" ||
+    !complaint.rejectedBy ||
+    complaint.rejectedBy !== "community" ||
     !complaint.rejectionExpiresAt
   ) {
     return complaint;
@@ -379,22 +380,12 @@ const checkAndClearExpiredRejection = async (complaint, complaintId) => {
     return complaint;
   }
 
-  await complaintRepository.setStatusWithMetadata(
-    complaintId,
-    COMPLAINT_STATUS.IN_PROGRESS,
-    {
-      closedBy: null,
-      closedAt: null,
-      rejectionCount: null,
-      rejectionExpiresAt: null,
-      validationRequestedAt: null,
-      validationRequestedBy: null,
-      validationRequestReasonType: null,
-      validationRequestReasonText: null,
-    },
-  );
-
-  await complaintVotesRepository.clearVotesByComplaintId(complaintId);
+  await complaintRepository.setStatusWithMetadata(complaintId, complaint.status, {
+    rejectedBy: null,
+    rejectedAt: null,
+    rejectionCount: null,
+    rejectionExpiresAt: null,
+  });
 
   return await complaintRepository.getDetail(complaintId);
 };
@@ -414,9 +405,9 @@ export const getStatus = async (complaintId, userId) => {
   const votingEnabled = isVotingEnabled(complaint);
 
   const rejectionInfo =
-    complaint.closedBy === "community" && complaint.rejectionExpiresAt
+    complaint.rejectedBy === "community" && complaint.rejectionExpiresAt
       ? {
-          rejectedAt: complaint.closedAt,
+          rejectedAt: complaint.rejectedAt,
           rejectionExpiresAt: complaint.rejectionExpiresAt,
           rejectionCount: complaint.rejectionCount,
         }

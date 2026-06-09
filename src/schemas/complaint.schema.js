@@ -78,6 +78,8 @@ export const complaintResponseSchema = complaintBaseSchema.extend({
   resolvedAt: z.any().optional(),
   closedBy: z.string().nullable().optional(),
   closedAt: z.any().optional(),
+  rejectedBy: z.string().nullable().optional(),
+  rejectedAt: z.any().optional(),
   rejectionExpiresAt: z.any().optional(),
   rejectionCount: z.number().nullable().optional(),
   proposedEvidenceIds: z.array(z.string()).nullable().optional(),
