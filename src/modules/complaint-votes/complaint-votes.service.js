@@ -7,9 +7,9 @@ import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { ValidationError } from "../../shared/errors/validation.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
-import { env } from "../../config/env.js";
 
-const VOTE_THRESHOLD_PERCENTAGE = 0.5;
+const VOTING_QUORUM_PERCENTAGE = 0.25;
+const APPROVAL_RATE_REQUIRED = 0.7;
 const OWNER_RESPONSE_DAYS = 7;
 
 const isOwnerInactive = (complaint) => {
@@ -23,37 +23,39 @@ const isOwnerInactive = (complaint) => {
   return daysSinceUpdate >= OWNER_RESPONSE_DAYS;
 };
 
-const checkAndApplyAutoResolveByValidationCount = async (complaint, complaintId) => {
-  // Se já está resolvido, não fazer nada
-  if (complaint.status === COMPLAINT_STATUS.RESOLVED) {
-    return { autoResolved: false };
-  }
-
-  const counts = await complaintVotesRepository.countByComplaintId(complaintId);
-  const minValidations = env.complaints.minValidationsAutoResolve;
-
-  // Se o total de validações atingiu o threshold, resolver automaticamente
-  if (counts.total >= minValidations) {
-    await complaintRepository.setStatusWithMetadata(
-      complaintId,
-      COMPLAINT_STATUS.RESOLVED,
-      {
-        resolvedBy: "community",
-        resolvedAt: new Date(),
-      },
-    );
-
-    return { autoResolved: true, reason: "validation_count_threshold" };
-  }
-
-  return { autoResolved: false };
-};
-
 const isVotingEnabled = (complaint) => {
   return (
     complaint.status === COMPLAINT_STATUS.AWAITING_VALIDATION &&
     (Boolean(complaint.validationRequestedAt) || isOwnerInactive(complaint))
   );
+};
+
+const getEligibleVoters = async (complaintId, authorId) => {
+  const [followerIds, volunteerIds] = await Promise.all([
+    complaintFollowersRepository.getFollowers(complaintId),
+    complaintVolunteersRepository.getVolunteers(complaintId),
+  ]);
+
+  const eligibleVoters = new Set([...followerIds, ...volunteerIds]);
+  eligibleVoters.delete(authorId);
+
+  return eligibleVoters;
+};
+
+const getVotingProgress = (counts, totalEligible) => {
+  const quorumRequired = Math.ceil(totalEligible * VOTING_QUORUM_PERCENTAGE);
+  const approvalRate = counts.total === 0 ? 0 : counts.approved / counts.total;
+  const quorumReached = counts.total >= quorumRequired;
+  const approvalRateReached = approvalRate >= APPROVAL_RATE_REQUIRED;
+
+  return {
+    quorumRequired,
+    approvalRate,
+    approvalRateRequired: APPROVAL_RATE_REQUIRED,
+    quorumReached,
+    approvalRateReached,
+    canResolve: totalEligible > 0 && quorumReached && approvalRateReached,
+  };
 };
 
 export const vote = async ({ complaintId, userId, approved }) => {
@@ -84,17 +86,13 @@ export const vote = async ({ complaintId, userId, approved }) => {
 
   await complaintVotesRepository.vote(complaintId, userId, approved);
 
-  const followerIds = await complaintFollowersRepository.getFollowers(complaintId);
-  const volunteerIds = await complaintVolunteersRepository.getVolunteers(complaintId);
-  const eligibleVoters = new Set([...followerIds, ...volunteerIds]);
-  eligibleVoters.delete(complaint.createdById);
+  const eligibleVoters = await getEligibleVoters(complaintId, complaint.createdById);
   const totalEligible = eligibleVoters.size;
 
   const counts = await complaintVotesRepository.countByComplaintId(complaintId);
-  const approvalThreshold = Math.ceil(totalEligible * VOTE_THRESHOLD_PERCENTAGE);
+  const votingProgress = getVotingProgress(counts, totalEligible);
 
-  // Verificar resolução por percentual (50%)
-  if (counts.approved >= approvalThreshold) {
+  if (votingProgress.canResolve) {
     await complaintRepository.setStatusWithMetadata(
       complaintId,
       COMPLAINT_STATUS.RESOLVED,
@@ -115,28 +113,10 @@ export const vote = async ({ complaintId, userId, approved }) => {
     return {
       message: "Voto registrado. Denúncia resolvida por votação da comunidade.",
       resolved: true,
-      reason: "approval_percentage_threshold",
-    };
-  }
-
-  // Verificar resolução por contagem total de validações
-  const autoResolveCheck = await checkAndApplyAutoResolveByValidationCount(
-    complaint,
-    complaintId,
-  );
-  if (autoResolveCheck.autoResolved) {
-    await notificationsService.notifyComplaintFollowers({
-      complaintId,
-      actorUserId: userId,
-      type: "status_change",
-      message: `A denúncia "${complaint.title}" foi resolvida automaticamente pela comunidade (limite de validações atingido).`,
-      sendPush: false,
-    });
-
-    return {
-      message: `Voto registrado. Denúncia resolvida automaticamente (${env.complaints.minValidationsAutoResolve} validações atingidas).`,
-      resolved: true,
-      reason: "validation_count_threshold",
+      votes: counts,
+      totalEligible,
+      reason: "community_quorum_approval",
+      ...votingProgress,
     };
   }
 
@@ -144,8 +124,8 @@ export const vote = async ({ complaintId, userId, approved }) => {
     message: "Voto registrado com sucesso",
     resolved: false,
     votes: counts,
-    threshold: approvalThreshold,
-    autoResolveThreshold: env.complaints.minValidationsAutoResolve,
+    totalEligible,
+    ...votingProgress,
   };
 };
 
@@ -156,10 +136,9 @@ export const getStatus = async (complaintId, userId) => {
     ? await complaintVotesRepository.hasVoted(complaintId, userId)
     : false;
 
-  const followerIds = await complaintFollowersRepository.getFollowers(complaintId);
-  const volunteerIds = await complaintVolunteersRepository.getVolunteers(complaintId);
-  const eligibleVoters = new Set([...followerIds, ...volunteerIds]);
-  eligibleVoters.delete(complaint.createdById);
+  const eligibleVoters = await getEligibleVoters(complaintId, complaint.createdById);
+  const totalEligible = eligibleVoters.size;
+  const votingProgress = getVotingProgress(counts, totalEligible);
 
   const votingEnabled = isVotingEnabled(complaint);
 
@@ -168,15 +147,7 @@ export const getStatus = async (complaintId, userId) => {
     votingEnabled,
     hasVoted,
     votes: counts,
-    threshold: Math.ceil(eligibleVoters.size * VOTE_THRESHOLD_PERCENTAGE),
-    totalEligible: eligibleVoters.size,
-    autoResolveThreshold: env.complaints.minValidationsAutoResolve,
-    validationsProgress: {
-      current: counts.total,
-      required: env.complaints.minValidationsAutoResolve,
-      willAutoResolve:
-        counts.total >= env.complaints.minValidationsAutoResolve &&
-        complaint.status !== COMPLAINT_STATUS.RESOLVED,
-    },
+    totalEligible,
+    ...votingProgress,
   };
 };
