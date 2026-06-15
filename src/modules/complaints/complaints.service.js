@@ -3,9 +3,29 @@ import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
 import { deleteFiles } from "../../shared/helpers/file.helper.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
+import { ValidationError } from "../../shared/errors/validation.error.js";
+import { ConflictError } from "../../shared/errors/conflict.error.js";
+import { ERROR_CODES } from "../../shared/types/error.codes.js";
 import * as complaintFollowersRepository from "../complaint-followers/complaint-followers.repository.js";
 import * as usersService from "../users/users.service.js";
 import * as notificationsService from "../notifications/notifications.service.js";
+import * as complaintValidationsRepository from "../complaint-validations/complaint-validations.repository.js";
+import * as complaintVolunteersRepository from "../complaint-volunteers/complaint-volunteers.repository.js";
+
+const VALID_TRANSITIONS = {
+  [COMPLAINT_STATUS.OPEN]: [COMPLAINT_STATUS.IN_PROGRESS],
+  [COMPLAINT_STATUS.IN_PROGRESS]: [COMPLAINT_STATUS.AWAITING_VALIDATION],
+  [COMPLAINT_STATUS.AWAITING_VALIDATION]: [COMPLAINT_STATUS.RESOLVED],
+  [COMPLAINT_STATUS.RESOLVED]: [],
+  [COMPLAINT_STATUS.CLOSED]: [],
+};
+const VALIDATION_REQUEST_ALLOWED_STATUS = [
+  COMPLAINT_STATUS.OPEN,
+  COMPLAINT_STATUS.IN_PROGRESS,
+  COMPLAINT_STATUS.AWAITING_VALIDATION,
+];
+const OWNER_RESPONSE_DAYS = 7;
+const OWNER_INACTIVE_REASON_TYPE = "owner_inactive";
 
 export const create = async (complaintData, authenticatedUserId) => {
   const complaintId = complaintRepository.createId();
@@ -15,6 +35,7 @@ export const create = async (complaintData, authenticatedUserId) => {
     createdById: authenticatedUserId,
     status: COMPLAINT_STATUS.OPEN,
     followersCount: 1,
+    volunteersCount: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -40,7 +61,7 @@ export const getAll = async () => {
 };
 
 export const getDetail = async (id) => {
-  const complaint = await complaintRepository.getDetail(id);
+  const complaint = await openValidationByOwnerInactivityIfNeeded(id);
   return await usersService.enrichWithCreatedByUsername(complaint);
 };
 
@@ -68,6 +89,36 @@ export const patch = async (id, body, authenticatedUserId) => {
   return await usersService.enrichWithCreatedByUsername(updated);
 };
 
+export const updateStatus = async (complaintId, newStatus, authenticatedUserId) => {
+  const complaint = await complaintRepository.getDetail(complaintId);
+
+  if (complaint.createdById !== authenticatedUserId) {
+    throw new ForbiddenError("Apenas o criador pode alterar o status desta denúncia");
+  }
+
+  const currentStatus = complaint.status;
+  const allowedTransitions = VALID_TRANSITIONS[currentStatus] || [];
+
+  if (!allowedTransitions.includes(newStatus)) {
+    throw new ValidationError(
+      `Transição de status inválida: "${currentStatus}" → "${newStatus}". Transições permitidas: ${allowedTransitions.join(", ") || "nenhuma"}`,
+      ERROR_CODES.COMPLAINT_INVALID_STATUS_TRANSITION,
+    );
+  }
+
+  const updated = await complaintRepository.setStatus(complaintId, newStatus);
+
+  await notificationsService.notifyComplaintFollowers({
+    complaintId,
+    actorUserId: authenticatedUserId,
+    type: "status_change",
+    message: `O status da denúncia "${complaint.title}" foi alterado para "${newStatus}".`,
+    sendPush: false,
+  });
+
+  return await usersService.enrichWithCreatedByUsername(updated);
+};
+
 export const deleteComplaint = async (id, authenticatedUserId) => {
   const complaint = await complaintRepository.getDetail(id);
 
@@ -90,6 +141,132 @@ export const findNearestWithinRadius = async ({ lat, lng, radiusKm }) => {
   return await usersService.enrichWithCreatedByUsernames(complaints);
 };
 
+const notifyValidationRequestRecipients = async ({
+  complaint,
+  complaintId,
+  actorUserId,
+}) => {
+  const [followerIds, volunteerIds] = await Promise.all([
+    complaintFollowersRepository.getFollowers(complaintId),
+    complaintVolunteersRepository.getVolunteers(complaintId),
+  ]);
+
+  const recipientIds = new Set([...followerIds, ...volunteerIds]);
+  if (actorUserId) recipientIds.delete(actorUserId);
+
+  return await Promise.all(
+    [...recipientIds].map((recipientId) =>
+      notificationsService.createNotification({
+        userId: recipientId,
+        complaintId,
+        type: "validation_request",
+        message: `A denúncia "${complaint.title}" precisa de validação.`,
+        sendPush: true,
+      }),
+    ),
+  );
+};
+
+const isOwnerInactive = (complaint) => {
+  const statusUpdatedAt = complaint.statusUpdatedAt ?? null;
+  if (!statusUpdatedAt) return false;
+
+  const statusUpdatedAtDate = new Date(statusUpdatedAt);
+  if (Number.isNaN(statusUpdatedAtDate.getTime())) return false;
+
+  const daysSinceUpdate =
+    (Date.now() - statusUpdatedAtDate.getTime()) / (1000 * 60 * 60 * 24);
+
+  return daysSinceUpdate >= OWNER_RESPONSE_DAYS;
+};
+
+const openValidationByOwnerInactivityIfNeeded = async (complaintId) => {
+  const complaint = await complaintRepository.getDetail(complaintId);
+
+  if (
+    complaint.status !== COMPLAINT_STATUS.AWAITING_VALIDATION ||
+    complaint.validationRequestedAt ||
+    !isOwnerInactive(complaint)
+  ) {
+    return complaint;
+  }
+
+  const result = await complaintRepository.requestValidationIfUnrequested(complaintId, {
+    requestedBy: null,
+    reasonType: OWNER_INACTIVE_REASON_TYPE,
+    reasonText: null,
+  });
+
+  if (result.opened) {
+    await notifyValidationRequestRecipients({
+      complaint: result.complaint,
+      complaintId,
+      actorUserId: null,
+    });
+  }
+
+  return result.complaint;
+};
+
+export const requestValidation = async (
+  complaintId,
+  authenticatedUserId,
+  { reasonType, reasonText, evidenceIds },
+) => {
+  const complaint = await complaintRepository.getDetail(complaintId);
+
+  const isVolunteer = await complaintVolunteersRepository.isVolunteer(
+    complaintId,
+    authenticatedUserId,
+  );
+
+  if (!isVolunteer) {
+    throw new ForbiddenError(
+      "Apenas voluntários vinculados podem abrir votação de validação.",
+    );
+  }
+
+  if (!VALIDATION_REQUEST_ALLOWED_STATUS.includes(complaint.status)) {
+    throw new ValidationError(
+      {
+        fieldErrors: {
+          status: [
+            "Apenas denúncias abertas, em andamento ou aguardando validação podem abrir votação.",
+          ],
+        },
+      },
+      ERROR_CODES.COMPLAINT_INVALID_STATUS_TRANSITION,
+    );
+  }
+
+  if (complaint.validationRequestedAt) {
+    throw new ConflictError("Votação de validação já foi aberta para esta denúncia");
+  }
+
+  if (reasonType === "evidence_selection") {
+    if (!evidenceIds || evidenceIds.length === 0) {
+      throw new ValidationError(
+        "Selecione ao menos uma evidência para propor à comunidade",
+      );
+    }
+  }
+
+  const updated = await complaintRepository.requestValidation(complaintId, {
+    requestedBy: authenticatedUserId,
+    reasonType,
+    reasonText,
+    evidenceIds: reasonType === "evidence_selection" ? evidenceIds : null,
+  });
+
+  await notifyValidationRequestRecipients({
+    complaint,
+    complaintId,
+    actorUserId: authenticatedUserId,
+  });
+
+  return await usersService.enrichWithCreatedByUsername(updated);
+};
+
 export const getFollowedByUsername = async (username) => {
   const userId = await usersService.getUidByUsername(username);
 
@@ -102,4 +279,44 @@ export const getFollowedByUsername = async (username) => {
   if (complaintIds.length === 0) return [];
 
   return await complaintRepository.getByIds(complaintIds);
+};
+
+const MIN_VALIDATIONS_TO_CONFIRM_RESOLUTION = 3;
+
+export const confirmResolution = async (complaintId, authenticatedUserId) => {
+  const complaint = await complaintRepository.getDetail(complaintId);
+
+  if (complaint.createdById !== authenticatedUserId) {
+    throw new ForbiddenError("Apenas o autor pode confirmar a resolução.");
+  }
+
+  if (complaint.status !== COMPLAINT_STATUS.AWAITING_VALIDATION) {
+    throw new ValidationError(
+      { fieldErrors: {} },
+      ERROR_CODES.VALIDATION_ERROR,
+      "A denúncia precisa estar aguardando validação.",
+    );
+  }
+
+  const { count } = await complaintValidationsRepository.countByComplaintId(complaintId);
+
+  if (count < MIN_VALIDATIONS_TO_CONFIRM_RESOLUTION) {
+    throw new ValidationError(
+      { fieldErrors: {} },
+      ERROR_CODES.VALIDATION_ERROR,
+      "Validações insuficientes para confirmar resolução.",
+    );
+  }
+
+  const updated = await complaintRepository.confirmResolution(complaintId);
+
+  await notificationsService.notifyComplaintFollowers({
+    complaintId,
+    actorUserId: authenticatedUserId,
+    type: "complaint_resolved",
+    message: `A denúncia "${complaint.title}" foi marcada como resolvida pelo autor.`,
+    sendPush: false,
+  });
+
+  return await usersService.enrichWithCreatedByUsername(updated);
 };

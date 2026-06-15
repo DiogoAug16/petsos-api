@@ -1,5 +1,6 @@
 import { db } from "../../config/firebase.js";
 import { env } from "../../config/env.js";
+import { distanceBetween } from "geofire-common";
 
 const USERNAMES_COLLECTION = `${env.firebase.collectionPrefix}usernames`;
 const USERS_COLLECTION = `${env.firebase.collectionPrefix}users`;
@@ -87,4 +88,32 @@ export async function getUserProfilesByIds(userIds) {
       id: doc.id,
       ...doc.data(),
     }));
+}
+
+export async function findNearestWithinRadius(lat, lng, radiusKm) {
+  const center = [Number(lat), Number(lng)];
+  const radiusInKm = Number(radiusKm);
+
+  const snapshot = await db.collection(USERS_COLLECTION).get();
+  const results = [];
+
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    if (!data.location) continue;
+
+    const userCenter = [data.location.latitude, data.location.longitude];
+    const distanceInKm = distanceBetween(userCenter, center);
+
+    if (distanceInKm <= radiusInKm) {
+      results.push({
+        id: doc.id,
+        ...data,
+        distanceKm: Number(distanceInKm.toFixed(3)),
+      });
+    }
+  }
+
+  results.sort((a, b) => a.distanceKm - b.distanceKm);
+
+  return results;
 }

@@ -68,3 +68,7 @@ export const enrichWithCreatedByUsername = async (item) => {
   const [enriched] = await enrichWithCreatedByUsernames([item]);
   return enriched;
 };
+
+export const findNearestWithinRadius = async ({ lat, lng, radiusKm }) => {
+  return await usersRepository.findNearestWithinRadius(lat, lng, radiusKm);
+};

@@ -37,6 +37,17 @@ export const patchComplaint = async (req, res) => {
 };
 
 /** @type {import("express").RequestHandler} */
+export const updateStatus = async (req, res) => {
+  const complaint = await complaintService.updateStatus(
+    req.params.id,
+    req.validatedStatusData.status,
+    req.userId,
+  );
+  const responseData = complaintResponseSchema.parse(complaint);
+  return success(res, responseData, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
 export const deleteComplaint = async (req, res) => {
   const complaint = await complaintService.deleteComplaint(req.params.id, req.userId);
   return success(res, complaint, StatusCodes.OK);
@@ -46,5 +57,23 @@ export const deleteComplaint = async (req, res) => {
 export const getNearest = async (req, res) => {
   const complaints = await complaintService.findNearestWithinRadius(req.validatedQuery);
   const responseData = z.array(complaintResponseSchema).parse(complaints);
+  return success(res, responseData, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
+export const confirmResolution = async (req, res) => {
+  const complaint = await complaintService.confirmResolution(req.params.id, req.userId);
+  const responseData = complaintResponseSchema.parse(complaint);
+  return success(res, responseData, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
+export const requestValidation = async (req, res) => {
+  const complaint = await complaintService.requestValidation(
+    req.params.id,
+    req.userId,
+    req.validatedValidationRequestData,
+  );
+  const responseData = complaintResponseSchema.parse(complaint);
   return success(res, responseData, StatusCodes.OK);
 };
