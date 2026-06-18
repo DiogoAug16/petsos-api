@@ -97,6 +97,62 @@ export const countUnread = async (userId) => {
 };
 
 /**
+ * Remove todas as notificações do usuário autenticado.
+ */
+export const clearUserNotifications = async (userId) => {
+  let deletedCount = 0;
+
+  while (true) {
+    const snapshot = await db
+      .collection(COLLECTION)
+      .where("userId", "==", userId)
+      .limit(500)
+      .get();
+
+    if (snapshot.empty) break;
+
+    const batch = db.batch();
+
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+    deletedCount += snapshot.size;
+  }
+
+  return deletedCount;
+};
+
+/**
+ * Remove todas as notificações vinculadas a uma denúncia.
+ */
+export const clearByComplaintId = async (complaintId) => {
+  let deletedCount = 0;
+
+  while (true) {
+    const snapshot = await db
+      .collection(COLLECTION)
+      .where("complaintId", "==", complaintId)
+      .limit(500)
+      .get();
+
+    if (snapshot.empty) break;
+
+    const batch = db.batch();
+
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+    deletedCount += snapshot.size;
+  }
+
+  return deletedCount;
+};
+
+/**
  * Busca notificação de comentário não lida para agrupamento inline.
  */
 export const findUnreadCommentNotification = async (userId, complaintId) => {

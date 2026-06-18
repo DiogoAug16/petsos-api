@@ -19,6 +19,16 @@ const router = Router();
 router.get("/", authenticateToken, wrap(notificationsController.getUserNotifications));
 
 /**
+ * DELETE /notifications
+ * Remove todas as notificações do usuário autenticado.
+ */
+router.delete(
+  "/",
+  authenticateToken,
+  wrap(notificationsController.clearUserNotifications),
+);
+
+/**
  * Retorna a quantidade de notificações não lidas
  * do usuário autenticado.
  */

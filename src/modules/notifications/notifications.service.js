@@ -85,6 +85,19 @@ export const markAsRead = async ({ notificationId, userId }) => {
   };
 };
 
+export const clearUserNotifications = async (userId) => {
+  const deletedCount = await notificationsRepository.clearUserNotifications(userId);
+
+  return {
+    deletedCount,
+    message: "Notificações limpas com sucesso",
+  };
+};
+
+export const clearByComplaintId = async (complaintId) => {
+  return await notificationsRepository.clearByComplaintId(complaintId);
+};
+
 /**
  * Registra ou atualiza pushToken do usuário.
  */
