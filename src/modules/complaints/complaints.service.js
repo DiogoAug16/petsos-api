@@ -129,6 +129,8 @@ export const deleteComplaint = async (id, authenticatedUserId) => {
   deleteFiles(complaint.photos);
 
   await complaintRepository.deleteComplaint(id);
+  await notificationsService.clearByComplaintId(id);
+
   return { message: "Denuncia excluida com sucesso" };
 };
 
