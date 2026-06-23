@@ -35,7 +35,6 @@ router.get(
 
 router.get(
   "/:complaintId",
-  authenticateToken,
   validateComplaintIdParam,
   wrap(complaintFollowersController.listByComplaint),
 );
