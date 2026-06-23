@@ -17,6 +17,7 @@ services:
   nginx:
     image: nginx:alpine
     container_name: nginx
+    restart: always
     ports:
       - "80:80"
       - "443:443"
@@ -32,6 +33,7 @@ services:
   certbot:
     image: certbot/certbot
     container_name: certbot
+    restart: always
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
