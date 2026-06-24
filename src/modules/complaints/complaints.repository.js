@@ -11,6 +11,8 @@ import { complaintsCursorSchema } from "../../schemas/pagination.schema.js";
 
 const COLLECTION = `${env.firebase.collectionPrefix}complaints`;
 const DOCUMENT_ID_FIELD = admin.firestore.FieldPath.documentId();
+const MAX_GEOHASH_RANGES_PER_MAP_QUERY = 9;
+const MAP_RANGE_LIMIT_MULTIPLIER = 2;
 
 const toGeoPoint = (data) => {
   if (!data.location) return data;
@@ -106,6 +108,42 @@ export const setStatusWithMetadata = async (id, status, metadata = {}) => {
 
   const updated = (await docRef.get()).data();
   return serialize(id, updated);
+};
+
+export const setStatusWithMetadataOnce = async (
+  id,
+  status,
+  metadata = {},
+  decisionId,
+) => {
+  const docRef = db.collection(COLLECTION).doc(id);
+
+  return await db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(docRef);
+    if (!doc.exists) throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+
+    const data = doc.data();
+    if (decisionId && data.communityDecisionId === decisionId) {
+      return { applied: false, complaint: serialize(id, data) };
+    }
+
+    const updateData = {
+      status,
+      statusUpdatedAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    for (const [key, value] of Object.entries(metadata)) {
+      updateData[key] = value === null ? FieldValue.delete() : value;
+    }
+
+    transaction.update(docRef, updateData);
+
+    return {
+      applied: true,
+      complaint: serialize(id, { ...data, ...metadata, status }),
+    };
+  });
 };
 
 export const requestValidation = async (
@@ -265,10 +303,25 @@ export const findNearestWithinRadius = async (lat, lng, radiusKm) => {
 export const findWithinBounds = async ({ north, south, east, west, limit }) => {
   const center = [(north + south) / 2, (east + west) / 2];
   const radiusInM = distanceBetween(center, [north, east]) * 1000;
-  const bounds = geohashQueryBounds(center, radiusInM);
+  const bounds = geohashQueryBounds(center, radiusInM).slice(
+    0,
+    MAX_GEOHASH_RANGES_PER_MAP_QUERY,
+  );
+  if (!bounds.length) return [];
+
+  const perRangeLimit = Math.max(
+    1,
+    Math.ceil((limit * MAP_RANGE_LIMIT_MULTIPLIER) / bounds.length),
+  );
   const snapshots = await Promise.all(
     bounds.map(([start, end]) =>
-      db.collection(COLLECTION).orderBy("geoHash").startAt(start).endAt(end).get(),
+      db
+        .collection(COLLECTION)
+        .orderBy("geoHash")
+        .startAt(start)
+        .endAt(end)
+        .limit(perRangeLimit)
+        .get(),
     ),
   );
   const resultsById = new Map();

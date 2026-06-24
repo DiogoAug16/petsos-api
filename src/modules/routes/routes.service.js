@@ -7,6 +7,7 @@ import logger from "../../logger/index.js";
 const ORS_DIRECTIONS_URL = "https://api.openrouteservice.org/v2/directions/driving-car";
 const ROUTE_CACHE_TTL_MS = 10 * 60 * 1000;
 const ROUTE_CACHE_MAX_ITEMS = 500;
+const ROUTE_REQUEST_TIMEOUT_MS = 8000;
 const routeCache = new Map();
 
 const roundCoordinate = (value) => Number(value).toFixed(5);
@@ -61,12 +62,24 @@ export const getDrivingRoute = async ({ start, end }) => {
     end: `${end.longitude},${end.latitude}`,
   });
 
-  const response = await fetch(`${ORS_DIRECTIONS_URL}?${params}`, {
-    headers: {
-      Accept: "application/json, application/geo+json",
-      Authorization: env.openRouteService.apiKey,
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ROUTE_REQUEST_TIMEOUT_MS);
+  let response;
+
+  try {
+    response = await fetch(`${ORS_DIRECTIONS_URL}?${params}`, {
+      headers: {
+        Accept: "application/json, application/geo+json",
+        Authorization: env.openRouteService.apiKey,
+      },
+      signal: controller.signal,
+    });
+  } catch (error) {
+    logger.warn({ error: error.message }, "OpenRouteService não respondeu");
+    throw unavailable("Serviço de rota indisponível");
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     logger.warn(
@@ -76,9 +89,21 @@ export const getDrivingRoute = async ({ start, end }) => {
     throw unavailable("Serviço de rota indisponível");
   }
 
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    logger.warn({ error: error.message }, "OpenRouteService retornou JSON inválido");
+    throw unavailable("Serviço de rota indisponível");
+  }
+
   const coordinates = data?.features?.[0]?.geometry?.coordinates;
-  const safeCoordinates = Array.isArray(coordinates) ? coordinates : [];
+  const safeCoordinates = Array.isArray(coordinates) ? coordinates : null;
+
+  if (!safeCoordinates?.length) {
+    logger.warn("OpenRouteService retornou rota sem coordenadas");
+    throw unavailable("Serviço de rota indisponível");
+  }
 
   setCachedRoute(cacheKey, safeCoordinates);
   return safeCoordinates;

@@ -3,7 +3,6 @@ import * as usersService from "../users/users.service.js";
 import * as commentLikesRepository from "../comment-likes/comment-likes.repository.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 
-
 export const create = async ({ complaintId, userId, text }) => {
   const comment = await commentsRepository.create({
     complaintId,

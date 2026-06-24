@@ -11,6 +11,8 @@ import sharp from "sharp";
 
 const PNG_SIGNATURE = "89504e470d0a1a0a";
 const UPLOAD_USAGE_CACHE_TTL_MS = 60 * 1000;
+const IMAGE_SIGNATURE_BYTES = 8;
+const THUMBNAIL_CONCURRENCY = 2;
 
 let uploadUsageCache = {
   bytes: null,
@@ -28,17 +30,26 @@ const flattenFiles = (files) => {
 
 export const removeUploadedFiles = (files = []) => {
   for (const file of flattenFiles(files)) {
-    try {
-      fs.unlinkSync(file.path);
-    } catch (error) {
+    fs.promises.unlink(file.path).catch((error) => {
       logger.debug({ path: file.path, error: error.message }, "Erro ao remover upload");
-    }
+    });
   }
 };
 
-const validateFileSignatures = (files = []) => {
+const readSignature = async (filePath) => {
+  const handle = await fs.promises.open(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(IMAGE_SIGNATURE_BYTES);
+    const { bytesRead } = await handle.read(buffer, 0, IMAGE_SIGNATURE_BYTES, 0);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
+  }
+};
+
+const validateFileSignatures = async (files = []) => {
   for (const file of files) {
-    const buffer = fs.readFileSync(file.path);
+    const buffer = await readSignature(file.path);
     if (!isJpeg(buffer) && !isPng(buffer)) {
       removeUploadedFiles(files);
       throw new ValidationError("Imagem inválida", ERROR_CODES.UPLOAD_ERROR);
@@ -46,14 +57,48 @@ const validateFileSignatures = (files = []) => {
   }
 };
 
-const getUploadedFilesSizeBytes = (files = []) => {
-  return flattenFiles(files).reduce((total, file) => {
-    try {
-      return total + fs.statSync(file.path).size;
-    } catch {
-      return total;
-    }
-  }, 0);
+const getUploadedFilesSizeBytes = async (files = []) => {
+  const sizes = await Promise.all(
+    flattenFiles(files).map(async (file) => {
+      try {
+        const stats = await fs.promises.stat(file.path);
+        return stats.size;
+      } catch {
+        return 0;
+      }
+    }),
+  );
+
+  return sizes.reduce((total, size) => total + size, 0);
+};
+
+const runWithConcurrency = async (items, concurrency, worker) => {
+  const results = [];
+  let firstError = null;
+  let nextIndex = 0;
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        try {
+          results[index] = await worker(items[index]);
+        } catch (error) {
+          firstError = firstError || error;
+        }
+      }
+    },
+  );
+
+  await Promise.all(workers);
+  if (firstError) {
+    firstError.results = results.filter(Boolean);
+    throw firstError;
+  }
+
+  return results;
 };
 
 const getUploadUsage = async () => {
@@ -82,7 +127,7 @@ const enforceUploadQuota = async (files = []) => {
   const uploadedFiles = flattenFiles(files);
   if (!uploadedFiles.length) return;
 
-  const uploadedBytes = getUploadedFilesSizeBytes(uploadedFiles);
+  const uploadedBytes = await getUploadedFilesSizeBytes(uploadedFiles);
   const usage = await getUploadUsage();
   const projectedBytes = usage.fromCache ? usage.bytes + uploadedBytes : usage.bytes;
 
@@ -131,12 +176,12 @@ const createThumbnails = async (files = []) => {
   if (!files.length) return [];
   const thumbnailFiles = [];
   try {
-    for (const file of files) {
-      thumbnailFiles.push(await createThumbnail(file));
-    }
+    thumbnailFiles.push(
+      ...(await runWithConcurrency(files, THUMBNAIL_CONCURRENCY, createThumbnail)),
+    );
     return thumbnailFiles;
   } catch (error) {
-    removeUploadedFiles([...files, ...thumbnailFiles]);
+    removeUploadedFiles([...files, ...thumbnailFiles, ...(error.results || [])]);
     logger.warn({ error: error.message }, "Erro ao gerar thumbnail");
     throw new ValidationError("Erro ao processar imagem", ERROR_CODES.UPLOAD_ERROR);
   }
@@ -152,7 +197,7 @@ export const validateUploadImage = (req, res, next) => {
     }
 
     try {
-      validateFileSignatures(req.files);
+      await validateFileSignatures(req.files);
       await enforceUploadQuota(req.files);
       next();
     } catch (error) {
@@ -172,7 +217,7 @@ export const validateComplaintUploadImages = (req, res, next) => {
 
     try {
       const photos = flattenFiles(req.files);
-      validateFileSignatures(photos);
+      await validateFileSignatures(photos);
       const thumbnailPhotos = await createThumbnails(photos);
       req.files = {
         photos,

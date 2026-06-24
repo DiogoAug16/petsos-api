@@ -15,6 +15,7 @@ import {
   validateUpdateComplaint,
   validateUpdateStatus,
   validateMapQuery,
+  validateMapTileQuery,
   validateNearestQuery,
   validateRequestValidation,
 } from "../validators/complaint.validator.js";
@@ -44,6 +45,12 @@ router.post(
 );
 
 router.get("/", validateComplaintsQuery, wrap(complaintController.getAll));
+
+router.get(
+  "/map/tile",
+  validateMapTileQuery,
+  wrap(complaintController.getMapTileComplaints),
+);
 
 router.get("/map", validateMapQuery, wrap(complaintController.getMapComplaints));
 

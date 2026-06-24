@@ -8,6 +8,7 @@ import { errorHandler } from "./src/shared/middlewares/error.middleware.js";
 import { rateLimit } from "./src/shared/middlewares/rate-limit.middleware.js";
 import { httpLogger } from "./src/config/pino-http.config.js";
 import logger from "./src/logger/index.js";
+import { setupMapTileRealtime } from "./src/modules/map-tiles/map-tiles.realtime.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,6 +39,8 @@ app.use(errorHandler);
 const server = app.listen(PORT, () => {
   logger.info(`Servidor rodando na porta ${PORT}`);
 });
+
+setupMapTileRealtime(server);
 
 server.keepAliveTimeout = 120 * 1000;
 server.headersTimeout = 121 * 1000;

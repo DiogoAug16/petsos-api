@@ -11,6 +11,11 @@ import * as usersService from "../users/users.service.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 import * as complaintValidationsRepository from "../complaint-validations/complaint-validations.repository.js";
 import * as complaintVolunteersRepository from "../complaint-volunteers/complaint-volunteers.repository.js";
+import { publishMapTileInvalidation } from "../map-tiles/map-tiles.realtime.js";
+import {
+  getChangedComplaintTileKeys,
+  getComplaintTileKeys,
+} from "../map-tiles/map-tiles.util.js";
 
 const VALID_TRANSITIONS = {
   [COMPLAINT_STATUS.OPEN]: [COMPLAINT_STATUS.IN_PROGRESS],
@@ -26,6 +31,22 @@ const VALIDATION_REQUEST_ALLOWED_STATUS = [
 ];
 const OWNER_RESPONSE_DAYS = 7;
 const OWNER_INACTIVE_REASON_TYPE = "owner_inactive";
+
+const tileYToLatitude = (y, zoom) => {
+  const radians = Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / 2 ** zoom)));
+  return (radians * 180) / Math.PI;
+};
+
+const getTileBounds = ({ z, x, y, limit }) => {
+  const tiles = 2 ** z;
+  return {
+    north: tileYToLatitude(y, z),
+    south: tileYToLatitude(y + 1, z),
+    west: (x / tiles) * 360 - 180,
+    east: ((x + 1) / tiles) * 360 - 180,
+    limit,
+  };
+};
 
 export const create = async (complaintData, authenticatedUserId) => {
   const complaintId = complaintRepository.createId();
@@ -48,6 +69,12 @@ export const create = async (complaintData, authenticatedUserId) => {
       complaint.createdAt,
     ),
   ]);
+
+  publishMapTileInvalidation({
+    tileKeys: getComplaintTileKeys(complaint),
+    complaintId,
+    action: "created",
+  });
 
   return {
     ...complaint,
@@ -82,6 +109,12 @@ export const patch = async (id, body, authenticatedUserId) => {
 
   const updated = await complaintRepository.patch(id, updatedData);
 
+  publishMapTileInvalidation({
+    tileKeys: getChangedComplaintTileKeys(complaint, updated),
+    complaintId: id,
+    action: "updated",
+  });
+
   await notificationsService.notifyComplaintFollowers({
     complaintId: id,
     actorUserId: authenticatedUserId,
@@ -111,6 +144,12 @@ export const updateStatus = async (complaintId, newStatus, authenticatedUserId) 
 
   const updated = await complaintRepository.setStatus(complaintId, newStatus);
 
+  publishMapTileInvalidation({
+    tileKeys: getComplaintTileKeys(updated),
+    complaintId,
+    action: "status_updated",
+  });
+
   await notificationsService.notifyComplaintFollowers({
     complaintId,
     actorUserId: authenticatedUserId,
@@ -129,9 +168,14 @@ export const deleteComplaint = async (id, authenticatedUserId) => {
     throw new ForbiddenError("Apenas o criador pode excluir esta denuncia");
   }
 
-  deleteFiles(complaint.photos);
+  await deleteFiles(complaint.photos);
 
   await complaintRepository.deleteComplaint(id);
+  publishMapTileInvalidation({
+    tileKeys: getComplaintTileKeys(complaint),
+    complaintId: id,
+    action: "deleted",
+  });
   return { message: "Denuncia excluida com sucesso" };
 };
 
@@ -146,6 +190,11 @@ export const findNearestWithinRadius = async ({ lat, lng, radiusKm }) => {
 
 export const findWithinBounds = async (bounds) => {
   const complaints = await complaintRepository.findWithinBounds(bounds);
+  return await usersService.enrichWithCreatedByUsernames(complaints);
+};
+
+export const findWithinTile = async (tile) => {
+  const complaints = await complaintRepository.findWithinBounds(getTileBounds(tile));
   return await usersService.enrichWithCreatedByUsernames(complaints);
 };
 
@@ -333,6 +382,12 @@ export const confirmResolution = async (complaintId, authenticatedUserId) => {
   }
 
   const updated = await complaintRepository.confirmResolution(complaintId);
+
+  publishMapTileInvalidation({
+    tileKeys: getComplaintTileKeys(updated),
+    complaintId,
+    action: "resolved",
+  });
 
   await notificationsService.notifyComplaintFollowers({
     complaintId,

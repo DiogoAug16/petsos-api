@@ -83,6 +83,14 @@ export const getMapComplaints = async (req, res) => {
 };
 
 /** @type {import("express").RequestHandler} */
+export const getMapTileComplaints = async (req, res) => {
+  const complaints = await complaintService.findWithinTile(req.validatedQuery);
+  const responseData = z.array(complaintResponseSchema).parse(complaints);
+  res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+  return success(res, responseData, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
 export const confirmResolution = async (req, res) => {
   const complaint = await complaintService.confirmResolution(req.params.id, req.userId);
   const responseData = complaintResponseSchema.parse(complaint);

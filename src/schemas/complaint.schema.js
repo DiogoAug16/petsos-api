@@ -73,6 +73,24 @@ export const mapQuerySchema = z.object({
     }),
 });
 
+export const mapTileQuerySchema = z.object({
+  query: z
+    .object({
+      z: z.coerce.number().int().min(10).max(18),
+      x: z.coerce.number().int().min(0),
+      y: z.coerce.number().int().min(0),
+      limit: z.coerce.number().int().min(1).max(150).default(120),
+    })
+    .refine((query) => query.x < 2 ** query.z, {
+      message: "Tile X inválido para o zoom informado",
+      path: ["x"],
+    })
+    .refine((query) => query.y < 2 ** query.z, {
+      message: "Tile Y inválido para o zoom informado",
+      path: ["y"],
+    }),
+});
+
 export const VALIDATION_REQUEST_REASON_TYPES = [
   "already_resolved",
   "false_report",
