@@ -3,13 +3,19 @@ import { UPLOADS_DIR } from "../config/storage.js";
 import { env } from "../config/env.js";
 import { ValidationError } from "../shared/errors/validation.error.js";
 import { ERROR_CODES } from "../shared/types/error.codes.js";
-import { getDirectorySizeBytes } from "../shared/helpers/file.helper.js";
+import { getDirectorySizeBytesAsync } from "../shared/helpers/file.helper.js";
 import logger from "../logger/index.js";
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 
 const PNG_SIGNATURE = "89504e470d0a1a0a";
+const UPLOAD_USAGE_CACHE_TTL_MS = 60 * 1000;
+
+let uploadUsageCache = {
+  bytes: null,
+  expiresAt: 0,
+};
 
 const isJpeg = (buffer) => buffer[0] === 0xff && buffer[1] === 0xd8;
 const isPng = (buffer) => buffer.subarray(0, 8).toString("hex") === PNG_SIGNATURE;
@@ -40,16 +46,54 @@ const validateFileSignatures = (files = []) => {
   }
 };
 
-const enforceUploadQuota = (files = []) => {
+const getUploadedFilesSizeBytes = (files = []) => {
+  return flattenFiles(files).reduce((total, file) => {
+    try {
+      return total + fs.statSync(file.path).size;
+    } catch {
+      return total;
+    }
+  }, 0);
+};
+
+const getUploadUsage = async () => {
+  const now = Date.now();
+  if (uploadUsageCache.bytes !== null && uploadUsageCache.expiresAt > now) {
+    return { bytes: uploadUsageCache.bytes, fromCache: true };
+  }
+
+  const bytes = await getDirectorySizeBytesAsync(UPLOADS_DIR);
+  uploadUsageCache = {
+    bytes,
+    expiresAt: now + UPLOAD_USAGE_CACHE_TTL_MS,
+  };
+  return { bytes, fromCache: false };
+};
+
+const addAcceptedUploadBytes = (bytes) => {
+  if (uploadUsageCache.bytes === null) return;
+  uploadUsageCache = {
+    ...uploadUsageCache,
+    bytes: uploadUsageCache.bytes + bytes,
+  };
+};
+
+const enforceUploadQuota = async (files = []) => {
   const uploadedFiles = flattenFiles(files);
   if (!uploadedFiles.length) return;
 
-  const usedBytes = getDirectorySizeBytes(UPLOADS_DIR);
-  if (usedBytes <= env.uploads.maxBytes) return;
+  const uploadedBytes = getUploadedFilesSizeBytes(uploadedFiles);
+  const usage = await getUploadUsage();
+  const projectedBytes = usage.fromCache ? usage.bytes + uploadedBytes : usage.bytes;
+
+  if (projectedBytes <= env.uploads.maxBytes) {
+    if (usage.fromCache) addAcceptedUploadBytes(uploadedBytes);
+    return;
+  }
 
   removeUploadedFiles(uploadedFiles);
   logger.warn(
-    { usedBytes, maxBytes: env.uploads.maxBytes },
+    { usedBytes: projectedBytes, maxBytes: env.uploads.maxBytes },
     "Limite de armazenamento de uploads atingido",
   );
   throw new ValidationError(
@@ -99,7 +143,7 @@ const createThumbnails = async (files = []) => {
 };
 
 export const validateUploadImage = (req, res, next) => {
-  upload.array("photos", 5)(req, res, (err) => {
+  upload.array("photos", 5)(req, res, async (err) => {
     if (err) {
       logger.warn({ error: err.message }, "Erro no upload de imagem");
       return next(
@@ -109,7 +153,7 @@ export const validateUploadImage = (req, res, next) => {
 
     try {
       validateFileSignatures(req.files);
-      enforceUploadQuota(req.files);
+      await enforceUploadQuota(req.files);
       next();
     } catch (error) {
       next(error);
@@ -134,7 +178,7 @@ export const validateComplaintUploadImages = (req, res, next) => {
         photos,
         thumbnailPhotos,
       };
-      enforceUploadQuota([...photos, ...thumbnailPhotos]);
+      await enforceUploadQuota([...photos, ...thumbnailPhotos]);
       next();
     } catch (error) {
       next(error);

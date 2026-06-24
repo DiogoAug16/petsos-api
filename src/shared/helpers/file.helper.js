@@ -16,7 +16,7 @@ export const deleteFiles = (filePaths = []) => {
   }
 };
 
-export const getDirectorySizeBytes = (dirPath) => {
+export const getDirectorySizeBytesAsync = async (dirPath) => {
   let total = 0;
   const pending = [dirPath];
 
@@ -24,13 +24,23 @@ export const getDirectorySizeBytes = (dirPath) => {
     const currentPath = pending.pop();
 
     try {
-      for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+      const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
+
+      for (const entry of entries) {
         const entryPath = path.join(currentPath, entry.name);
 
         if (entry.isDirectory()) {
           pending.push(entryPath);
         } else if (entry.isFile()) {
-          total += fs.statSync(entryPath).size;
+          try {
+            const stats = await fs.promises.stat(entryPath);
+            total += stats.size;
+          } catch (error) {
+            logger.debug(
+              { path: entryPath, error: error.message },
+              "Arquivo ignorado ao medir uploads",
+            );
+          }
         }
       }
     } catch (error) {
