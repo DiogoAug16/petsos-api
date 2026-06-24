@@ -3,6 +3,8 @@ import { VALID_COMPLAINT_TYPES } from "../shared/types/complaint.types.js";
 import { VALID_COMPLAINT_STATUS } from "../shared/types/complaint.status.js";
 import { VALID_COMPLAINT_ANIMALS } from "../shared/types/complaint.animals.js";
 
+const MAX_MAP_VIEWPORT_DELTA = 0.35;
+
 const locationSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
@@ -56,6 +58,18 @@ export const mapQuerySchema = z.object({
     .refine((query) => query.north > query.south, {
       message: "Bounds inválidos",
       path: ["north"],
+    })
+    .refine((query) => query.east > query.west, {
+      message: "Bounds inválidos",
+      path: ["east"],
+    })
+    .refine((query) => query.north - query.south <= MAX_MAP_VIEWPORT_DELTA, {
+      message: "Área do mapa muito grande",
+      path: ["north"],
+    })
+    .refine((query) => query.east - query.west <= MAX_MAP_VIEWPORT_DELTA, {
+      message: "Área do mapa muito grande",
+      path: ["east"],
     }),
 });
 
