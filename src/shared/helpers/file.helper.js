@@ -15,3 +15,28 @@ export const deleteFiles = (filePaths = []) => {
     }
   }
 };
+
+export const getDirectorySizeBytes = (dirPath) => {
+  let total = 0;
+  const pending = [dirPath];
+
+  while (pending.length) {
+    const currentPath = pending.pop();
+
+    try {
+      for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+        const entryPath = path.join(currentPath, entry.name);
+
+        if (entry.isDirectory()) {
+          pending.push(entryPath);
+        } else if (entry.isFile()) {
+          total += fs.statSync(entryPath).size;
+        }
+      }
+    } catch (error) {
+      logger.warn({ path: currentPath, error: error.message }, "Erro ao medir uploads");
+    }
+  }
+
+  return total;
+};

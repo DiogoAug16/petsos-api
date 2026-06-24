@@ -31,3 +31,8 @@ export const commentsCursorSchema = z.tuple([
   z.number().finite().transform(millisToTimestamp),
   z.string().trim().min(1),
 ]);
+
+export const complaintsCursorSchema = z.tuple([
+  z.number().finite().transform(millisToTimestamp),
+  z.string().trim().min(1),
+]);

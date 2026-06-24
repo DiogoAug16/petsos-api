@@ -6,6 +6,7 @@ import "../config/zod.config.js";
 import complaintFollowersRoutes from "./complaint-followers.routes.js";
 import complaintVolunteersRoutes from "./complaint-volunteers.routes.js";
 import notificationsRoutes from "./notifications.routes.js";
+import routesRoutes from "./routes.routes.js";
 
 const router = Router();
 
@@ -15,5 +16,6 @@ router.use("/complaints", complaintRoutes);
 router.use("/complaint-followers", complaintFollowersRoutes);
 router.use("/complaint-volunteers", complaintVolunteersRoutes);
 router.use("/notifications", notificationsRoutes);
+router.use("/routes", routesRoutes);
 
 export default router;

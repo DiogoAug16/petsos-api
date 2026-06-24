@@ -1,9 +1,11 @@
-import "./src/config/env.js";
 import "./src/config/storage.js";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import routes from "./src/routes/index.js";
+import { env } from "./src/config/env.js";
 import { errorHandler } from "./src/shared/middlewares/error.middleware.js";
+import { rateLimit } from "./src/shared/middlewares/rate-limit.middleware.js";
 import { httpLogger } from "./src/config/pino-http.config.js";
 import logger from "./src/logger/index.js";
 
@@ -12,11 +14,23 @@ const PORT = process.env.PORT || 3000;
 
 app.set("trust proxy", 1);
 
-app.use(cors());
-app.use(express.json());
+app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(cors(env.cors.origin ? { origin: env.cors.origin } : undefined));
+app.use(express.json({ limit: "1mb" }));
 app.use(httpLogger);
 
-app.use("/uploads", express.static("uploads"));
+app.use(
+  "/uploads",
+  express.static("uploads", {
+    dotfiles: "deny",
+    immutable: true,
+    maxAge: "7d",
+    setHeaders: (res) => {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+    },
+  }),
+);
+app.use("/api", rateLimit({ windowMs: 60 * 1000, max: 300, keyPrefix: "api" }));
 app.use("/api", routes);
 
 app.use(errorHandler);

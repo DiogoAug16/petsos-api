@@ -55,9 +55,12 @@ export const create = async (complaintData, authenticatedUserId) => {
   };
 };
 
-export const getAll = async () => {
-  const complaints = await complaintRepository.getAll();
-  return await usersService.enrichWithCreatedByUsernames(complaints);
+export const getAll = async ({ limit, cursor }) => {
+  const page = await complaintRepository.getPage({ limit, cursor });
+  return {
+    ...page,
+    items: await usersService.enrichWithCreatedByUsernames(page.items),
+  };
 };
 
 export const getDetail = async (id) => {
@@ -138,6 +141,11 @@ export const findNearestWithinRadius = async ({ lat, lng, radiusKm }) => {
     lng,
     radiusKm,
   );
+  return await usersService.enrichWithCreatedByUsernames(complaints);
+};
+
+export const findWithinBounds = async (bounds) => {
+  const complaints = await complaintRepository.findWithinBounds(bounds);
   return await usersService.enrichWithCreatedByUsernames(complaints);
 };
 
@@ -279,6 +287,22 @@ export const getFollowedByUsername = async (username) => {
   if (complaintIds.length === 0) return [];
 
   return await complaintRepository.getByIds(complaintIds);
+};
+
+export const getFollowedSummaryByUsername = async (username) => {
+  const userId = await usersService.getUidByUsername(username);
+
+  if (!userId) {
+    throw new NotFoundError();
+  }
+
+  const complaintIds = await complaintFollowersRepository.getComplaintIdsByUserId(userId);
+  const statusSummary = await complaintRepository.getStatusSummaryByIds(complaintIds);
+
+  return {
+    total: statusSummary.total,
+    resolved: statusSummary.resolved,
+  };
 };
 
 const MIN_VALIDATIONS_TO_CONFIRM_RESOLUTION = 3;
