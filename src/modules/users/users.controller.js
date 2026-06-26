@@ -30,3 +30,11 @@ export const getFollowedComplaints = async (req, res) => {
   const responseData = z.array(publicComplaintSummarySchema).parse(complaints);
   return success(res, responseData, StatusCodes.OK);
 };
+
+/** @type {import("express").RequestHandler} */
+export const getFollowedComplaintsSummary = async (req, res) => {
+  const responseData = await complaintService.getFollowedSummaryByUsername(
+    req.validatedParams.username,
+  );
+  return success(res, responseData, StatusCodes.OK);
+};

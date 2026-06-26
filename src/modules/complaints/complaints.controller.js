@@ -3,18 +3,28 @@ import { success } from "../../shared/utils/response.util.js";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
 import { complaintResponseSchema } from "../../schemas/complaint.schema.js";
+import { paginatedResponseSchema } from "../../schemas/pagination.schema.js";
+import { removeUploadedFiles } from "../../validators/upload.validator.js";
 
 /** @type {import("express").RequestHandler} */
 export const create = async (req, res) => {
-  const complaint = await complaintService.create(req.validatedComplaintData, req.userId);
-  const responseData = complaintResponseSchema.parse(complaint);
-  return success(res, responseData, StatusCodes.CREATED);
+  try {
+    const complaint = await complaintService.create(
+      req.validatedComplaintData,
+      req.userId,
+    );
+    const responseData = complaintResponseSchema.parse(complaint);
+    return success(res, responseData, StatusCodes.CREATED);
+  } catch (error) {
+    removeUploadedFiles(req.files);
+    throw error;
+  }
 };
 
 /** @type {import("express").RequestHandler} */
 export const getAll = async (req, res) => {
-  const complaints = await complaintService.getAll();
-  const responseData = z.array(complaintResponseSchema).parse(complaints);
+  const complaints = await complaintService.getAll(req.validatedQuery);
+  const responseData = paginatedResponseSchema(complaintResponseSchema).parse(complaints);
   return success(res, responseData, StatusCodes.OK);
 };
 
@@ -27,13 +37,18 @@ export const getDetail = async (req, res) => {
 
 /** @type {import("express").RequestHandler} */
 export const patchComplaint = async (req, res) => {
-  const complaint = await complaintService.patch(
-    req.params.id,
-    req.validatedComplaintData,
-    req.userId,
-  );
-  const responseData = complaintResponseSchema.parse(complaint);
-  return success(res, responseData, StatusCodes.OK);
+  try {
+    const complaint = await complaintService.patch(
+      req.params.id,
+      req.validatedComplaintData,
+      req.userId,
+    );
+    const responseData = complaintResponseSchema.parse(complaint);
+    return success(res, responseData, StatusCodes.OK);
+  } catch (error) {
+    removeUploadedFiles(req.files);
+    throw error;
+  }
 };
 
 /** @type {import("express").RequestHandler} */
@@ -57,6 +72,21 @@ export const deleteComplaint = async (req, res) => {
 export const getNearest = async (req, res) => {
   const complaints = await complaintService.findNearestWithinRadius(req.validatedQuery);
   const responseData = z.array(complaintResponseSchema).parse(complaints);
+  return success(res, responseData, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
+export const getMapComplaints = async (req, res) => {
+  const complaints = await complaintService.findWithinBounds(req.validatedQuery);
+  const responseData = z.array(complaintResponseSchema).parse(complaints);
+  return success(res, responseData, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
+export const getMapTileComplaints = async (req, res) => {
+  const complaints = await complaintService.findWithinTile(req.validatedQuery);
+  const responseData = z.array(complaintResponseSchema).parse(complaints);
+  res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
   return success(res, responseData, StatusCodes.OK);
 };
 

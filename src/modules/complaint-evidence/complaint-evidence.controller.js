@@ -1,20 +1,26 @@
 import { StatusCodes } from "http-status-codes";
 import * as complaintEvidenceService from "./complaint-evidence.service.js";
 import { success } from "../../shared/utils/response.util.js";
+import { removeUploadedFiles } from "../../validators/upload.validator.js";
 
 export const submitEvidence = async (req, res) => {
   const photos = req.files?.map((file) => `/uploads/${file.filename}`) ?? [];
 
-  const result = await complaintEvidenceService.submitEvidence(
-    req.params.id,
-    req.userId,
-    {
-      description: req.body.description,
-      photos,
-    },
-  );
+  try {
+    const result = await complaintEvidenceService.submitEvidence(
+      req.params.id,
+      req.userId,
+      {
+        description: req.body.description,
+        photos,
+      },
+    );
 
-  return success(res, result, StatusCodes.CREATED);
+    return success(res, result, StatusCodes.CREATED);
+  } catch (error) {
+    removeUploadedFiles(req.files);
+    throw error;
+  }
 };
 
 export const getByComplaintId = async (req, res) => {

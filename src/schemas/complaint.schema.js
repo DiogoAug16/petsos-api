@@ -3,6 +3,8 @@ import { VALID_COMPLAINT_TYPES } from "../shared/types/complaint.types.js";
 import { VALID_COMPLAINT_STATUS } from "../shared/types/complaint.status.js";
 import { VALID_COMPLAINT_ANIMALS } from "../shared/types/complaint.animals.js";
 
+const MAX_MAP_VIEWPORT_DELTA = 0.35;
+
 const locationSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
@@ -15,6 +17,7 @@ const complaintBaseSchema = z.object({
   animal: z.enum(VALID_COMPLAINT_ANIMALS),
   location: locationSchema,
   photos: z.array(z.string()).optional(),
+  thumbnailPhotos: z.array(z.string()).optional(),
 });
 
 export const createComplaintSchema = complaintBaseSchema.refine(
@@ -39,8 +42,53 @@ export const nearestQuerySchema = z.object({
   query: z.object({
     lat: z.coerce.number().min(-90).max(90),
     lng: z.coerce.number().min(-180).max(180),
-    radiusKm: z.coerce.number().positive(),
+    radiusKm: z.coerce.number().positive().max(50),
   }),
+});
+
+export const mapQuerySchema = z.object({
+  query: z
+    .object({
+      north: z.coerce.number().min(-90).max(90),
+      south: z.coerce.number().min(-90).max(90),
+      east: z.coerce.number().min(-180).max(180),
+      west: z.coerce.number().min(-180).max(180),
+      limit: z.coerce.number().int().min(1).max(150).default(120),
+    })
+    .refine((query) => query.north > query.south, {
+      message: "Bounds inválidos",
+      path: ["north"],
+    })
+    .refine((query) => query.east > query.west, {
+      message: "Bounds inválidos",
+      path: ["east"],
+    })
+    .refine((query) => query.north - query.south <= MAX_MAP_VIEWPORT_DELTA, {
+      message: "Área do mapa muito grande",
+      path: ["north"],
+    })
+    .refine((query) => query.east - query.west <= MAX_MAP_VIEWPORT_DELTA, {
+      message: "Área do mapa muito grande",
+      path: ["east"],
+    }),
+});
+
+export const mapTileQuerySchema = z.object({
+  query: z
+    .object({
+      z: z.coerce.number().int().min(10).max(18),
+      x: z.coerce.number().int().min(0),
+      y: z.coerce.number().int().min(0),
+      limit: z.coerce.number().int().min(1).max(150).default(120),
+    })
+    .refine((query) => query.x < 2 ** query.z, {
+      message: "Tile X inválido para o zoom informado",
+      path: ["x"],
+    })
+    .refine((query) => query.y < 2 ** query.z, {
+      message: "Tile Y inválido para o zoom informado",
+      path: ["y"],
+    }),
 });
 
 export const VALIDATION_REQUEST_REASON_TYPES = [

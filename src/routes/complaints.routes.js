@@ -5,11 +5,17 @@ import * as complaintVotesController from "../modules/complaint-votes/complaint-
 import * as complaintValidationsController from "../modules/complaint-validations/complaint-validations.controller.js";
 import commentsRoutes from "./comments.routes.js";
 import { wrap } from "../shared/utils/async-handler.util.js";
-import { validateUploadImage } from "../validators/upload.validator.js";
+import {
+  validateComplaintUploadImages,
+  validateUploadImage,
+} from "../validators/upload.validator.js";
 import {
   validateCreateComplaint,
+  validateComplaintsQuery,
   validateUpdateComplaint,
   validateUpdateStatus,
+  validateMapQuery,
+  validateMapTileQuery,
   validateNearestQuery,
   validateRequestValidation,
 } from "../validators/complaint.validator.js";
@@ -19,18 +25,34 @@ import {
 } from "../validators/complaint-evidence.validator.js";
 import { validateVote } from "../validators/complaint-votes.validator.js";
 import { authenticateToken } from "../shared/middlewares/auth.middleware.js";
+import { rateLimit } from "../shared/middlewares/rate-limit.middleware.js";
+
+const uploadRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 40,
+  keyPrefix: "uploads",
+});
 
 const router = Router();
 
 router.post(
   "/",
   authenticateToken,
-  validateUploadImage,
+  uploadRateLimit,
+  validateComplaintUploadImages,
   validateCreateComplaint,
   wrap(complaintController.create),
 );
 
-router.get("/", wrap(complaintController.getAll));
+router.get("/", validateComplaintsQuery, wrap(complaintController.getAll));
+
+router.get(
+  "/map/tile",
+  validateMapTileQuery,
+  wrap(complaintController.getMapTileComplaints),
+);
+
+router.get("/map", validateMapQuery, wrap(complaintController.getMapComplaints));
 
 router.get("/nearest", validateNearestQuery, wrap(complaintController.getNearest));
 
@@ -39,6 +61,7 @@ router.use("/:id/comments", commentsRoutes);
 router.post(
   "/:id/evidences",
   authenticateToken,
+  uploadRateLimit,
   validateUploadImage,
   validateSubmitEvidence,
   wrap(complaintEvidenceController.submitEvidence),
@@ -108,7 +131,8 @@ router.patch(
 router.patch(
   "/:id",
   authenticateToken,
-  validateUploadImage,
+  uploadRateLimit,
+  validateComplaintUploadImages,
   validateUpdateComplaint,
   wrap(complaintController.patchComplaint),
 );

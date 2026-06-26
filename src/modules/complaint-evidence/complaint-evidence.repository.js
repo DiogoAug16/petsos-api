@@ -7,6 +7,8 @@ import { serialize } from "../../shared/utils/firestore.util.js";
 const COLLECTION = `${env.firebase.collectionPrefix}complaint_evidence`;
 const COMPLAINTS_COLLECTION = `${env.firebase.collectionPrefix}complaints`;
 
+export const getDocRef = (id) => db.collection(COLLECTION).doc(id);
+
 export const create = async (complaintId, evidenceData) => {
   const complaintRef = db.collection(COMPLAINTS_COLLECTION).doc(complaintId);
   const complaintDoc = await complaintRef.get();

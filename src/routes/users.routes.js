@@ -9,6 +9,12 @@ const router = Router();
 router.get("/me", authenticateToken, wrap(usersController.getMe));
 
 router.get(
+  "/:username/followed-complaints/summary",
+  validateUsernameParam,
+  wrap(usersController.getFollowedComplaintsSummary),
+);
+
+router.get(
   "/:username/followed-complaints",
   validateUsernameParam,
   wrap(usersController.getFollowedComplaints),
