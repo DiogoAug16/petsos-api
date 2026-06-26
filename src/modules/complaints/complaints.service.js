@@ -176,6 +176,9 @@ export const deleteComplaint = async (id, authenticatedUserId) => {
     complaintId: id,
     action: "deleted",
   });
+
+  await notificationsService.clearByComplaintId(id);
+
   return { message: "Denuncia excluida com sucesso" };
 };
 
