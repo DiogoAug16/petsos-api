@@ -20,3 +20,9 @@ export const checkUsername = async (req, res) => {
   const result = await authService.checkUsername(req.params.username);
   return success(res, result, StatusCodes.OK);
 };
+
+/** @type {import("express").RequestHandler} */
+export const validateEmail = async (req, res) => {
+  const result = await authService.validateEmail(req.validatedEmailData.email);
+  return success(res, result, StatusCodes.OK);
+};

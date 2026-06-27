@@ -7,6 +7,7 @@ import complaintFollowersRoutes from "./complaint-followers.routes.js";
 import complaintVolunteersRoutes from "./complaint-volunteers.routes.js";
 import notificationsRoutes from "./notifications.routes.js";
 import routesRoutes from "./routes.routes.js";
+import locationsRoutes from "./locations.routes.js";
 
 const router = Router();
 
@@ -17,5 +18,6 @@ router.use("/complaint-followers", complaintFollowersRoutes);
 router.use("/complaint-volunteers", complaintVolunteersRoutes);
 router.use("/notifications", notificationsRoutes);
 router.use("/routes", routesRoutes);
+router.use("/locations", locationsRoutes);
 
 export default router;

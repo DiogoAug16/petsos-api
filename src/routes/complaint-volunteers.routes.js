@@ -1,7 +1,10 @@
 import { Router } from "express";
 import * as complaintVolunteersController from "../modules/complaint-volunteers/complaint-volunteers.controller.js";
 import { wrap } from "../shared/utils/async-handler.util.js";
-import { authenticateToken } from "../shared/middlewares/auth.middleware.js";
+import {
+  authenticateToken,
+  requireVerifiedEmail,
+} from "../shared/middlewares/auth.middleware.js";
 import { validateComplaintIdParam } from "../validators/complaint-followers.validator.js";
 
 const router = Router();
@@ -9,6 +12,7 @@ const router = Router();
 router.post(
   "/:complaintId",
   authenticateToken,
+  requireVerifiedEmail,
   validateComplaintIdParam,
   wrap(complaintVolunteersController.volunteer),
 );
@@ -23,6 +27,7 @@ router.get(
 router.delete(
   "/:complaintId",
   authenticateToken,
+  requireVerifiedEmail,
   validateComplaintIdParam,
   wrap(complaintVolunteersController.unvolunteer),
 );

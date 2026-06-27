@@ -23,3 +23,13 @@ export const checkUsernameSchema = z.object({
       .min(1, "Username é obrigatório"),
   }),
 });
+
+export const validateEmailSchema = z.object({
+  body: z.object({
+    email: z
+      .string({ required_error: "Email é obrigatório" })
+      .trim()
+      .toLowerCase()
+      .pipe(z.email("Email inválido")),
+  }),
+});

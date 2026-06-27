@@ -1,6 +1,9 @@
 import { Router } from "express";
 
-import { authenticateToken } from "../shared/middlewares/auth.middleware.js";
+import {
+  authenticateToken,
+  requireVerifiedEmail,
+} from "../shared/middlewares/auth.middleware.js";
 import { wrap } from "../shared/utils/async-handler.util.js";
 
 import {
@@ -16,7 +19,12 @@ const router = Router();
  * GET /notifications
  * Lista as notificações do usuário autenticado.
  */
-router.get("/", authenticateToken, wrap(notificationsController.getUserNotifications));
+router.get(
+  "/",
+  authenticateToken,
+  requireVerifiedEmail,
+  wrap(notificationsController.getUserNotifications),
+);
 
 /**
  * DELETE /notifications
@@ -25,6 +33,7 @@ router.get("/", authenticateToken, wrap(notificationsController.getUserNotificat
 router.delete(
   "/",
   authenticateToken,
+  requireVerifiedEmail,
   wrap(notificationsController.clearUserNotifications),
 );
 
@@ -32,7 +41,12 @@ router.delete(
  * Retorna a quantidade de notificações não lidas
  * do usuário autenticado.
  */
-router.get("/unread-count", authenticateToken, notificationsController.countUnread);
+router.get(
+  "/unread-count",
+  authenticateToken,
+  requireVerifiedEmail,
+  notificationsController.countUnread,
+);
 
 /**
  * PATCH /notifications/:id/read
@@ -41,6 +55,7 @@ router.get("/unread-count", authenticateToken, notificationsController.countUnre
 router.patch(
   "/:id/read",
   authenticateToken,
+  requireVerifiedEmail,
   validateNotificationIdParam,
   wrap(notificationsController.markAsRead),
 );
@@ -52,6 +67,7 @@ router.patch(
 router.post(
   "/register-token",
   authenticateToken,
+  requireVerifiedEmail,
   validateRegisterPushToken,
   wrap(notificationsController.registerPushToken),
 );
@@ -59,6 +75,7 @@ router.post(
 router.post(
   "/test",
   authenticateToken,
+  requireVerifiedEmail,
   wrap(notificationsController.createTestNotification),
 );
 

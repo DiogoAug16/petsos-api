@@ -5,7 +5,10 @@ import * as commentLikesController from "../modules/comment-likes/comment-likes.
 import * as commentsValidator from "../validators/comment.validator.js";
 import * as commentRepliesValidator from "../validators/comment-reply.validator.js";
 import * as commentLikesValidator from "../validators/comment-like.validator.js";
-import { authenticateToken } from "../shared/middlewares/auth.middleware.js";
+import {
+  authenticateToken,
+  requireVerifiedEmail,
+} from "../shared/middlewares/auth.middleware.js";
 import { wrap } from "../shared/utils/async-handler.util.js";
 
 const router = Router({ mergeParams: true });
@@ -13,6 +16,7 @@ const router = Router({ mergeParams: true });
 router.post(
   "/",
   authenticateToken,
+  requireVerifiedEmail,
   commentsValidator.validateCreateComment,
   wrap(commentsController.create),
 );
@@ -20,6 +24,7 @@ router.post(
 router.post(
   "/:commentId/replies",
   authenticateToken,
+  requireVerifiedEmail,
   commentRepliesValidator.validateCreateCommentReply,
   wrap(commentRepliesController.create),
 );
@@ -27,6 +32,7 @@ router.post(
 router.post(
   "/:commentId/likes",
   authenticateToken,
+  requireVerifiedEmail,
   commentLikesValidator.validateCommentLike,
   wrap(commentLikesController.like),
 );
@@ -34,6 +40,7 @@ router.post(
 router.delete(
   "/:commentId/likes",
   authenticateToken,
+  requireVerifiedEmail,
   commentLikesValidator.validateCommentLike,
   wrap(commentLikesController.unlike),
 );
