@@ -91,6 +91,13 @@ export const getMapTileComplaints = async (req, res) => {
 };
 
 /** @type {import("express").RequestHandler} */
+export const getMapTilesIndex = async (req, res) => {
+  const items = await complaintService.getMapTilesIndex(req.validatedQuery);
+  res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  return success(res, { items }, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
 export const confirmResolution = async (req, res) => {
   const complaint = await complaintService.confirmResolution(req.params.id, req.userId);
   const responseData = complaintResponseSchema.parse(complaint);

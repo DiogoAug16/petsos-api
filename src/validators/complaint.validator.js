@@ -6,6 +6,7 @@ import {
   updateStatusSchema,
   mapQuerySchema,
   mapTileQuerySchema,
+  mapTilesIndexQuerySchema,
   nearestQuerySchema,
   requestValidationSchema,
 } from "../schemas/complaint.schema.js";
@@ -81,6 +82,18 @@ export const validateMapQuery = (req, res, next) => {
 
 export const validateMapTileQuery = (req, res, next) => {
   const result = mapTileQuerySchema.safeParse({ query: req.query });
+
+  if (!result.success) {
+    const errors = z.flattenError(result.error);
+    throw new ValidationError(errors, ERROR_CODES.COMPLAINT_VALIDATION);
+  }
+
+  req.validatedQuery = result.data.query;
+  next();
+};
+
+export const validateMapTilesIndexQuery = (req, res, next) => {
+  const result = mapTilesIndexQuerySchema.safeParse({ query: req.query });
 
   if (!result.success) {
     const errors = z.flattenError(result.error);
