@@ -30,6 +30,52 @@ services:
     networks:
       - app-network
 
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: prometheus
+    restart: always
+    environment:
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - |
+        printf "%s" "$${METRICS_TOKEN}" > /tmp/metrics-token
+        exec /bin/prometheus \
+          --config.file=/etc/prometheus/prometheus.yml \
+          --storage.tsdb.path=/prometheus \
+          --web.console.libraries=/usr/share/prometheus/console_libraries \
+          --web.console.templates=/usr/share/prometheus/consoles
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: grafana
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - app-network
+
   certbot:
     image: certbot/certbot
     container_name: certbot
@@ -41,3 +87,7 @@ services:
 
 networks:
   app-network:
+
+volumes:
+  prometheus-data:
+  grafana-data:

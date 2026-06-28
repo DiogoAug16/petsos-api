@@ -22,6 +22,20 @@ export const publicUserProfileSchema = z.object({
   updatedAt: z.any().optional(),
 });
 
+export const followedComplaintsSummarySchema = z.object({
+  total: z.number(),
+  resolved: z.number(),
+});
+
+export const publicUserProfileSummarySchema = z.object({
+  profile: publicUserProfileSchema,
+  followedSummary: followedComplaintsSummarySchema,
+});
+
+export const currentUserSummarySchema = publicUserProfileSummarySchema.extend({
+  unreadNotifications: z.number(),
+});
+
 export const updateUserProfileSchema = z.object({
   body: z.object({
     name: z
