@@ -10,9 +10,10 @@
     "backfill:complaint-geohashes": "node scripts/backfill-complaint-geohashes.js",
     "backfill:map-tile-stats": "node scripts/backfill-map-tile-stats.js",
     "backfill:complaint-thumbnails": "node scripts/backfill-complaint-thumbnails.js",
-    "bench:complaints": "sh -c 'BENCH_URL=${BENCH_URL:-http://localhost:3030}; autocannon -d 15 -c 20 \"$BENCH_URL/api/complaints?limit=50\"'",
-    "bench:map-index": "sh -c 'BENCH_URL=${BENCH_URL:-http://localhost:3030}; autocannon -d 15 -c 20 \"$BENCH_URL/api/complaints/map/tiles-index?lat=-15.62&lng=-56.05&radiusKm=10&z=12\"'",
-    "bench:openapi": "sh -c 'BENCH_URL=${BENCH_URL:-http://localhost:3030}; autocannon -d 10 -c 10 \"$BENCH_URL/api/openapi.json\"'",
+    "bench": "npm run bench:complaints && npm run bench:map-index",
+    "bench:complaints": "sh -c 'BENCH_URL=${BENCH_URL:-http://localhost:3030}; autocannon -d 30 -c 2 -R 4 \"$BENCH_URL/api/complaints?limit=20\"'",
+    "bench:map-index": "sh -c 'BENCH_URL=${BENCH_URL:-http://localhost:3030}; autocannon -d 30 -c 2 -R 4 \"$BENCH_URL/api/complaints/map/tiles-index?lat=-15.62&lng=-56.05&radiusKm=10&z=12\"'",
+    "bench:openapi": "sh -c 'BENCH_URL=${BENCH_URL:-http://localhost:3030}; autocannon -d 10 -c 2 -R 10 \"$BENCH_URL/api/openapi.json\"'",
     "lint:check": "prettier --check .",
     "lint:fix": "prettier --write .",
     "prepare": "husky"

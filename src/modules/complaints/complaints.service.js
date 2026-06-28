@@ -122,11 +122,7 @@ export const create = async (complaintData, authenticatedUserId) => {
 };
 
 export const getAll = async ({ limit, cursor }) => {
-  const page = await complaintRepository.getPage({ limit, cursor });
-  return {
-    ...page,
-    items: await usersService.enrichWithCreatedByUsernames(page.items),
-  };
+  return await complaintRepository.getSummaryPage({ limit, cursor });
 };
 
 export const getDetail = async (id) => {

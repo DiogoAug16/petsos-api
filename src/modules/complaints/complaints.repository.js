@@ -44,11 +44,42 @@ const getPageCursorValuesFromDoc = (doc) => {
   return [timestampToMillis(data.createdAt), doc.id];
 };
 
+const SUMMARY_FIELDS = [
+  "title",
+  "description",
+  "type",
+  "animal",
+  "location",
+  "thumbnailPhotos",
+  "status",
+  "followersCount",
+  "createdAt",
+  "updatedAt",
+];
+
 export const getPage = async ({ limit, cursor }) => {
   const query = db
     .collection(COLLECTION)
     .orderBy("createdAt", "desc")
     .orderBy(DOCUMENT_ID_FIELD);
+  return await paginateFirestore({
+    query,
+    cursor,
+    limit,
+    cursorContext: { collection: COLLECTION },
+    cursorSchema: complaintsCursorSchema,
+    getCursorValuesFromDoc: getPageCursorValuesFromDoc,
+    mapDoc: (doc) => serialize(doc.id, doc.data()),
+  });
+};
+
+export const getSummaryPage = async ({ limit, cursor }) => {
+  const query = db
+    .collection(COLLECTION)
+    .orderBy("createdAt", "desc")
+    .orderBy(DOCUMENT_ID_FIELD)
+    .select(...SUMMARY_FIELDS);
+
   return await paginateFirestore({
     query,
     cursor,

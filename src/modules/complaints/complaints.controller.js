@@ -2,7 +2,10 @@ import * as complaintService from "./complaints.service.js";
 import { success } from "../../shared/utils/response.util.js";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
-import { complaintResponseSchema } from "../../schemas/complaint.schema.js";
+import {
+  complaintResponseSchema,
+  publicComplaintSummarySchema,
+} from "../../schemas/complaint.schema.js";
 import { paginatedResponseSchema } from "../../schemas/pagination.schema.js";
 import { removeUploadedFiles } from "../../validators/upload.validator.js";
 import logger from "../../logger/index.js";
@@ -26,7 +29,9 @@ export const create = async (req, res) => {
 /** @type {import("express").RequestHandler} */
 export const getAll = async (req, res) => {
   const complaints = await complaintService.getAll(req.validatedQuery);
-  const responseData = paginatedResponseSchema(complaintResponseSchema).parse(complaints);
+  const responseData = paginatedResponseSchema(publicComplaintSummarySchema).parse(
+    complaints,
+  );
   return success(res, responseData, StatusCodes.OK);
 };
 
