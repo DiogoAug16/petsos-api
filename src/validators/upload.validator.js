@@ -206,6 +206,27 @@ export const validateUploadImage = (req, res, next) => {
   });
 };
 
+export const validateProfilePhotoUpload = (req, res, next) => {
+  upload.single("photo")(req, res, async (err) => {
+    if (err) {
+      logger.warn({ error: err.message }, "Erro no upload da foto de perfil");
+      return next(
+        new ValidationError("Erro ao fazer upload da imagem", ERROR_CODES.UPLOAD_ERROR),
+      );
+    }
+
+    try {
+      if (req.file) {
+        await validateFileSignatures([req.file]);
+        await enforceUploadQuota([req.file]);
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  });
+};
+
 export const validateComplaintUploadImages = (req, res, next) => {
   complaintUpload.array("photos", 5)(req, res, async (err) => {
     if (err) {

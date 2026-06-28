@@ -1,11 +1,20 @@
 import * as usersRepository from "./users.repository.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
+import { deleteFiles } from "../../shared/helpers/file.helper.js";
 
 const toPublicProfile = (profile) => ({
   name: profile.name ?? null,
   username: profile.username,
+  description: profile.description ?? null,
+  locationLabel: profile.locationLabel ?? null,
+  photoUrl: profile.photoUrl ?? null,
   createdAt: profile.createdAt,
+  updatedAt: profile.updatedAt,
 });
+
+const isLocalUploadPath = (path) => {
+  return typeof path === "string" && path.startsWith("/uploads/");
+};
 
 export const getUidByUsername = async (username) => {
   return await usersRepository.getUidByUsername(username);
@@ -29,6 +38,39 @@ export const getPublicProfileById = async (userId) => {
   }
 
   return toPublicProfile(profile);
+};
+
+export const updateCurrentProfile = async (
+  userId,
+  { name, description, locationLabel, photoUrl },
+) => {
+  const currentProfile = await usersRepository.getUserById(userId);
+
+  if (!currentProfile) {
+    throw new NotFoundError();
+  }
+
+  const updateData = {
+    name,
+    description: description || null,
+    locationLabel: locationLabel || null,
+  };
+
+  if (photoUrl) {
+    updateData.photoUrl = photoUrl;
+  }
+
+  const updatedProfile = await usersRepository.updateProfile(userId, updateData);
+
+  if (
+    photoUrl &&
+    currentProfile.photoUrl !== photoUrl &&
+    isLocalUploadPath(currentProfile.photoUrl)
+  ) {
+    await deleteFiles([currentProfile.photoUrl]);
+  }
+
+  return toPublicProfile(updatedProfile);
 };
 
 export const getUsernamesByIds = async (uids) => {

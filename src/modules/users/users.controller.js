@@ -5,6 +5,7 @@ import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
 import { publicComplaintSummarySchema } from "../../schemas/complaint.schema.js";
 import { publicUserProfileSchema } from "../../schemas/user.schema.js";
+import { removeUploadedFiles } from "../../validators/upload.validator.js";
 
 /** @type {import("express").RequestHandler} */
 export const getMe = async (req, res) => {
@@ -20,6 +21,23 @@ export const getPublicProfile = async (req, res) => {
   );
   const responseData = publicUserProfileSchema.parse(profile);
   return success(res, responseData, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
+export const updateMe = async (req, res) => {
+  const photoUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+  try {
+    const profile = await usersService.updateCurrentProfile(req.userId, {
+      ...req.validatedUserProfileData,
+      photoUrl,
+    });
+    const responseData = publicUserProfileSchema.parse(profile);
+    return success(res, responseData, StatusCodes.OK);
+  } catch (error) {
+    removeUploadedFiles(req.file ? [req.file] : []);
+    throw error;
+  }
 };
 
 /** @type {import("express").RequestHandler} */

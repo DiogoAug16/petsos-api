@@ -4,6 +4,7 @@ import {
   UnauthorizedError,
 } from "../../shared/errors/auth.error.js";
 import * as authRepository from "./auth.repository.js";
+import { assertEmailCanReceiveMessages } from "./email-validation.service.js";
 import logger from "../../logger/index.js";
 
 export async function completeProfile(idToken, profileData) {
@@ -18,37 +19,33 @@ export async function completeProfile(idToken, profileData) {
   }
 
   const uid = decodedToken.uid;
+  const email = decodedToken.email || (await admin.auth().getUser(uid)).email;
+  await assertEmailCanReceiveMessages(email);
 
-  const existingUser = await authRepository.getUserDocument(uid);
-  if (existingUser) {
-    logger.info({ uid }, "Perfil já existe, retornando dados");
-    return {
-      uid,
-      email: existingUser.email,
-      displayName: existingUser.name,
-    };
-  }
-
-  const usernameExists = await authRepository.checkUsernameExists(username);
-  if (usernameExists) {
-    throw new UsernameAlreadyExistsError();
-  }
-
-  const userRecord = await admin.auth().getUser(uid);
-
-  await authRepository.createUserDocument(uid, {
-    email: userRecord.email,
+  const result = await authRepository.createUserProfileTransaction(uid, {
+    email,
     name,
     username,
   });
 
-  await authRepository.createUsernameDocument(username, uid, userRecord.email);
+  if (result.usernameTaken) {
+    throw new UsernameAlreadyExistsError();
+  }
 
-  logger.info({ uid, email: userRecord.email }, "Perfil completado com sucesso");
+  if (!result.created) {
+    logger.info({ uid }, "Perfil já existe, retornando dados");
+    return {
+      uid,
+      email: result.user.email,
+      displayName: result.user.name,
+    };
+  }
+
+  logger.info({ uid, email }, "Perfil completado com sucesso");
 
   return {
     uid,
-    email: userRecord.email,
+    email,
     displayName: name,
   };
 }
@@ -61,4 +58,8 @@ export async function resolveUsername(username) {
 export async function checkUsername(username) {
   const exists = await authRepository.checkUsernameExists(username);
   return { available: !exists };
+}
+
+export async function validateEmail(email) {
+  return await assertEmailCanReceiveMessages(email);
 }

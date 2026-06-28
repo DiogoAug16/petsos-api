@@ -4,6 +4,9 @@ import * as complaintFollowersRepository from "../complaint-followers/complaint-
 import * as complaintVolunteersRepository from "../complaint-volunteers/complaint-volunteers.repository.js";
 import * as complaintEvidenceRepository from "../complaint-evidence/complaint-evidence.repository.js";
 import * as notificationsService from "../notifications/notifications.service.js";
+import * as mapTilesService from "../map-tiles/map-tiles.service.js";
+import { publishMapTileInvalidation } from "../map-tiles/map-tiles.realtime.js";
+import { getComplaintTileKeys } from "../map-tiles/map-tiles.util.js";
 import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { ValidationError } from "../../shared/errors/validation.error.js";
@@ -34,6 +37,24 @@ const isVotingEnabled = (complaint) => {
     complaint.status === COMPLAINT_STATUS.AWAITING_VALIDATION &&
     (Boolean(complaint.validationRequestedAt) || isOwnerInactive(complaint))
   );
+};
+
+const syncAndPublishComplaintStatusTile = async ({
+  previousComplaint,
+  nextComplaint,
+  complaintId,
+  action,
+}) => {
+  await mapTilesService.syncComplaintTileStats({
+    previousComplaint,
+    nextComplaint,
+  });
+
+  publishMapTileInvalidation({
+    tileKeys: getComplaintTileKeys(nextComplaint || previousComplaint),
+    complaintId,
+    action,
+  });
 };
 
 const getEligibleVoters = async (complaintId, authorId) => {
@@ -234,6 +255,15 @@ export const vote = async ({ complaintId, userId, approved }) => {
     });
 
   if (["resolved", "closed", "rejected"].includes(decision.outcome)) {
+    if (decision.status) {
+      await syncAndPublishComplaintStatusTile({
+        previousComplaint: complaint,
+        nextComplaint: { ...complaint, status: decision.status },
+        complaintId,
+        action: `community_${decision.outcome}`,
+      });
+    }
+
     await notificationsService.createNotification({
       userId: complaint.createdById,
       complaintId,
@@ -359,6 +389,13 @@ export const voteEvidenceSelection = async ({ complaintId, userId, evidenceIds }
       );
 
       if (finalization.applied) {
+        await syncAndPublishComplaintStatusTile({
+          previousComplaint: complaint,
+          nextComplaint: finalization.complaint,
+          complaintId,
+          action: "community_evidence_resolved",
+        });
+
         await notificationsService.createNotification({
           userId: complaint.createdById,
           complaintId,

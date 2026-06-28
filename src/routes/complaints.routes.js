@@ -16,6 +16,7 @@ import {
   validateUpdateStatus,
   validateMapQuery,
   validateMapTileQuery,
+  validateMapTilesIndexQuery,
   validateNearestQuery,
   validateRequestValidation,
 } from "../validators/complaint.validator.js";
@@ -24,7 +25,10 @@ import {
   validateEvidence,
 } from "../validators/complaint-evidence.validator.js";
 import { validateVote } from "../validators/complaint-votes.validator.js";
-import { authenticateToken } from "../shared/middlewares/auth.middleware.js";
+import {
+  authenticateToken,
+  requireVerifiedEmail,
+} from "../shared/middlewares/auth.middleware.js";
 import { rateLimit } from "../shared/middlewares/rate-limit.middleware.js";
 
 const uploadRateLimit = rateLimit({
@@ -38,6 +42,7 @@ const router = Router();
 router.post(
   "/",
   authenticateToken,
+  requireVerifiedEmail,
   uploadRateLimit,
   validateComplaintUploadImages,
   validateCreateComplaint,
@@ -45,6 +50,12 @@ router.post(
 );
 
 router.get("/", validateComplaintsQuery, wrap(complaintController.getAll));
+
+router.get(
+  "/map/tiles-index",
+  validateMapTilesIndexQuery,
+  wrap(complaintController.getMapTilesIndex),
+);
 
 router.get(
   "/map/tile",
@@ -61,6 +72,7 @@ router.use("/:id/comments", commentsRoutes);
 router.post(
   "/:id/evidences",
   authenticateToken,
+  requireVerifiedEmail,
   uploadRateLimit,
   validateUploadImage,
   validateSubmitEvidence,
@@ -77,6 +89,7 @@ router.get("/:id/evidences", wrap(complaintEvidenceController.getByComplaintId))
 router.post(
   "/:id/evidences/validate",
   authenticateToken,
+  requireVerifiedEmail,
   validateEvidence,
   wrap(complaintEvidenceController.validateEvidence),
 );
@@ -84,6 +97,7 @@ router.post(
 router.post(
   "/:id/votes",
   authenticateToken,
+  requireVerifiedEmail,
   validateVote,
   wrap(complaintVotesController.vote),
 );
@@ -97,6 +111,7 @@ router.get(
 router.post(
   "/:id/votes/evidence-selection",
   authenticateToken,
+  requireVerifiedEmail,
   wrap(complaintVotesController.voteEvidenceSelection),
 );
 
@@ -109,12 +124,14 @@ router.get(
 router.post(
   "/:id/confirm-resolution",
   authenticateToken,
+  requireVerifiedEmail,
   wrap(complaintController.confirmResolution),
 );
 
 router.post(
   "/:id/request-validation",
   authenticateToken,
+  requireVerifiedEmail,
   validateRequestValidation,
   wrap(complaintController.requestValidation),
 );
@@ -124,6 +141,7 @@ router.get("/:id", wrap(complaintController.getDetail));
 router.patch(
   "/:id/status",
   authenticateToken,
+  requireVerifiedEmail,
   validateUpdateStatus,
   wrap(complaintController.updateStatus),
 );
@@ -131,12 +149,18 @@ router.patch(
 router.patch(
   "/:id",
   authenticateToken,
+  requireVerifiedEmail,
   uploadRateLimit,
   validateComplaintUploadImages,
   validateUpdateComplaint,
   wrap(complaintController.patchComplaint),
 );
 
-router.delete("/:id", authenticateToken, wrap(complaintController.deleteComplaint));
+router.delete(
+  "/:id",
+  authenticateToken,
+  requireVerifiedEmail,
+  wrap(complaintController.deleteComplaint),
+);
 
 export default router;

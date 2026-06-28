@@ -46,3 +46,55 @@ export async function createUsernameDocument(username, uid, email) {
     uid,
   });
 }
+
+export async function createUserProfileTransaction(uid, userData) {
+  const normalizedUsername = userData.username.toLowerCase();
+  const userRef = db.collection(USERS_COLLECTION).doc(uid);
+  const usernameRef = db.collection(USERNAMES_COLLECTION).doc(normalizedUsername);
+
+  return await db.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+
+    if (userDoc.exists) {
+      return {
+        created: false,
+        user: userDoc.data(),
+      };
+    }
+
+    const usernameDoc = await transaction.get(usernameRef);
+
+    if (usernameDoc.exists) {
+      return {
+        usernameTaken: true,
+      };
+    }
+
+    const user = {
+      email: userData.email,
+      name: userData.name,
+      username: normalizedUsername,
+
+      pushToken: null,
+
+      notificationPreferences: {
+        comments: true,
+        updates: true,
+        statusChanges: true,
+      },
+
+      createdAt: new Date().toISOString(),
+    };
+
+    transaction.set(userRef, user);
+    transaction.set(usernameRef, {
+      email: userData.email,
+      uid,
+    });
+
+    return {
+      created: true,
+      user,
+    };
+  });
+}

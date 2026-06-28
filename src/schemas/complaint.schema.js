@@ -2,8 +2,13 @@ import { z } from "zod";
 import { VALID_COMPLAINT_TYPES } from "../shared/types/complaint.types.js";
 import { VALID_COMPLAINT_STATUS } from "../shared/types/complaint.status.js";
 import { VALID_COMPLAINT_ANIMALS } from "../shared/types/complaint.animals.js";
+import {
+  TILE_INDEX_MAX_ZOOM,
+  TILE_INDEX_MIN_ZOOM,
+} from "../modules/map-tiles/map-tiles.util.js";
 
 const MAX_MAP_VIEWPORT_DELTA = 0.35;
+const MAX_MAP_TILE_INDEX_RADIUS_KM = 25;
 
 const locationSchema = z.object({
   latitude: z.number().min(-90).max(90),
@@ -89,6 +94,20 @@ export const mapTileQuerySchema = z.object({
       message: "Tile Y inválido para o zoom informado",
       path: ["y"],
     }),
+});
+
+export const mapTilesIndexQuerySchema = z.object({
+  query: z.object({
+    lat: z.coerce.number().min(-90).max(90),
+    lng: z.coerce.number().min(-180).max(180),
+    radiusKm: z.coerce.number().positive().max(MAX_MAP_TILE_INDEX_RADIUS_KM).default(10),
+    z: z.coerce
+      .number()
+      .int()
+      .min(TILE_INDEX_MIN_ZOOM)
+      .max(TILE_INDEX_MAX_ZOOM)
+      .default(12),
+  }),
 });
 
 export const VALIDATION_REQUEST_REASON_TYPES = [
