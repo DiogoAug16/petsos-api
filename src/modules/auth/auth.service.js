@@ -6,8 +6,14 @@ import {
 import * as authRepository from "./auth.repository.js";
 import { assertEmailCanReceiveMessages } from "./email-validation.service.js";
 import logger from "../../logger/index.js";
+import {
+  createTimer,
+  getEmailDomain,
+  roundDurationMs,
+} from "../../shared/utils/log.util.js";
 
 export async function completeProfile(idToken, profileData) {
+  const getDurationMs = createTimer();
   const { name, username } = profileData;
 
   let decodedToken;
@@ -33,7 +39,14 @@ export async function completeProfile(idToken, profileData) {
   }
 
   if (!result.created) {
-    logger.info({ uid }, "Perfil já existe, retornando dados");
+    logger.info(
+      {
+        event: "auth.complete_profile.existing",
+        uid,
+        durationMs: roundDurationMs(getDurationMs()),
+      },
+      "Perfil já existe, retornando dados",
+    );
     return {
       uid,
       email: result.user.email,
@@ -41,7 +54,15 @@ export async function completeProfile(idToken, profileData) {
     };
   }
 
-  logger.info({ uid, email }, "Perfil completado com sucesso");
+  logger.info(
+    {
+      event: "auth.complete_profile.created",
+      uid,
+      emailDomain: getEmailDomain(email),
+      durationMs: roundDurationMs(getDurationMs()),
+    },
+    "Perfil completado com sucesso",
+  );
 
   return {
     uid,

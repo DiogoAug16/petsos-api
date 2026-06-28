@@ -6,6 +6,7 @@ import {
   updateStatusSchema,
   mapQuerySchema,
   mapTileQuerySchema,
+  mapTilesBatchSchema,
   mapTilesIndexQuerySchema,
   nearestQuerySchema,
   requestValidationSchema,
@@ -89,6 +90,18 @@ export const validateMapTileQuery = (req, res, next) => {
   }
 
   req.validatedQuery = result.data.query;
+  next();
+};
+
+export const validateMapTilesBatch = (req, res, next) => {
+  const result = mapTilesBatchSchema.safeParse(req.body);
+
+  if (!result.success) {
+    const errors = z.flattenError(result.error);
+    throw new ValidationError(errors, ERROR_CODES.COMPLAINT_VALIDATION);
+  }
+
+  req.validatedBody = result.data;
   next();
 };
 

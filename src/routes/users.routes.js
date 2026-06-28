@@ -9,6 +9,7 @@ import { validateProfilePhotoUpload } from "../validators/upload.validator.js";
 const router = Router();
 
 router.get("/me", authenticateToken, wrap(usersController.getMe));
+router.get("/me/summary", authenticateToken, wrap(usersController.getMeSummary));
 
 router.patch(
   "/me",
@@ -28,6 +29,12 @@ router.get(
   "/:username/followed-complaints",
   validateUsernameParam,
   wrap(usersController.getFollowedComplaints),
+);
+
+router.get(
+  "/:username/profile-summary",
+  validateUsernameParam,
+  wrap(usersController.getPublicProfileSummary),
 );
 
 router.get("/:username", validateUsernameParam, wrap(usersController.getPublicProfile));

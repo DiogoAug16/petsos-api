@@ -9,15 +9,25 @@ import { rateLimit } from "./src/shared/middlewares/rate-limit.middleware.js";
 import { httpLogger } from "./src/config/pino-http.config.js";
 import logger from "./src/logger/index.js";
 import { setupMapTileRealtime } from "./src/modules/map-tiles/map-tiles.realtime.js";
+import { metricsHandler, metricsMiddleware } from "./src/config/metrics.config.js";
+import {
+  openApiSpec,
+  swaggerUiServe,
+  swaggerUiSetup,
+} from "./src/config/swagger.config.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.set("trust proxy", 1);
 
+app.get("/api/openapi.json", (req, res) => res.json(openApiSpec));
+app.use("/api/docs", swaggerUiServe, swaggerUiSetup);
+
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors(env.cors.origin ? { origin: env.cors.origin } : undefined));
 app.use(express.json({ limit: "1mb" }));
+app.use(metricsMiddleware);
 app.use(httpLogger);
 
 app.use(
@@ -25,12 +35,14 @@ app.use(
   express.static("uploads", {
     dotfiles: "deny",
     immutable: true,
-    maxAge: "7d",
+    maxAge: "30d",
     setHeaders: (res) => {
+      res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
       res.setHeader("X-Content-Type-Options", "nosniff");
     },
   }),
 );
+app.get("/api/metrics", metricsHandler);
 app.use("/api", rateLimit({ windowMs: 60 * 1000, max: 300, keyPrefix: "api" }));
 app.use("/api", routes);
 

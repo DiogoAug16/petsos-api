@@ -1,6 +1,7 @@
 import * as usersRepository from "./users.repository.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import { deleteFiles } from "../../shared/helpers/file.helper.js";
+import logger from "../../logger/index.js";
 
 const toPublicProfile = (profile) => ({
   name: profile.name ?? null,
@@ -69,6 +70,16 @@ export const updateCurrentProfile = async (
   ) {
     await deleteFiles([currentProfile.photoUrl]);
   }
+
+  logger.info(
+    {
+      event: "users.profile.updated",
+      userId,
+      changedFields: Object.keys(updateData),
+      photoChanged: Boolean(photoUrl),
+    },
+    "Perfil do usuário atualizado",
+  );
 
   return toPublicProfile(updatedProfile);
 };

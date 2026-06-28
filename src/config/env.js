@@ -24,4 +24,7 @@ export const env = {
   uploads: {
     maxBytes: numberFromEnv(process.env.UPLOADS_MAX_BYTES, 2 * 1024 * 1024 * 1024),
   },
+  metrics: {
+    token: process.env.METRICS_TOKEN || null,
+  },
 };

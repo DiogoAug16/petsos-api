@@ -3,6 +3,11 @@ import { env } from "../../config/env.js";
 import { AppError } from "../../shared/errors/app.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
 import logger from "../../logger/index.js";
+import {
+  createTimer,
+  getErrorLogData,
+  roundDurationMs,
+} from "../../shared/utils/log.util.js";
 
 const ORS_DIRECTIONS_URL = "https://api.openrouteservice.org/v2/directions/driving-car";
 const ROUTE_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -45,7 +50,13 @@ const unavailable = (message, statusCode = StatusCodes.BAD_GATEWAY) =>
   new AppError(message, statusCode, ERROR_CODES.ROUTE_SERVICE_UNAVAILABLE);
 
 export const getDrivingRoute = async ({ start, end }) => {
+  const getDurationMs = createTimer();
+
   if (!env.openRouteService.apiKey) {
+    logger.warn(
+      { event: "routes.driving.missing_api_key" },
+      "OpenRouteService não configurado",
+    );
     throw unavailable(
       "OPENROUTESERVICE_API_KEY não configurada no backend",
       StatusCodes.SERVICE_UNAVAILABLE,
@@ -54,7 +65,17 @@ export const getDrivingRoute = async ({ start, end }) => {
 
   const cacheKey = getRouteCacheKey({ start, end });
   const cachedCoordinates = getCachedRoute(cacheKey);
-  if (cachedCoordinates) return cachedCoordinates;
+  if (cachedCoordinates) {
+    logger.debug(
+      {
+        event: "routes.driving.cache_hit",
+        coordinateCount: cachedCoordinates.length,
+        durationMs: roundDurationMs(getDurationMs()),
+      },
+      "Rota retornada do cache",
+    );
+    return cachedCoordinates;
+  }
 
   const params = new URLSearchParams({
     geometry_simplify: "false",
@@ -75,7 +96,14 @@ export const getDrivingRoute = async ({ start, end }) => {
       signal: controller.signal,
     });
   } catch (error) {
-    logger.warn({ error: error.message }, "OpenRouteService não respondeu");
+    logger.warn(
+      {
+        event: "routes.driving.external_unavailable",
+        error: getErrorLogData(error),
+        durationMs: roundDurationMs(getDurationMs()),
+      },
+      "OpenRouteService não respondeu",
+    );
     throw unavailable("Serviço de rota indisponível");
   } finally {
     clearTimeout(timeout);
@@ -83,7 +111,12 @@ export const getDrivingRoute = async ({ start, end }) => {
 
   if (!response.ok) {
     logger.warn(
-      { status: response.status, statusText: response.statusText },
+      {
+        event: "routes.driving.external_rejected",
+        status: response.status,
+        statusText: response.statusText,
+        durationMs: roundDurationMs(getDurationMs()),
+      },
       "OpenRouteService recusou a rota",
     );
     throw unavailable("Serviço de rota indisponível");
@@ -93,7 +126,14 @@ export const getDrivingRoute = async ({ start, end }) => {
   try {
     data = await response.json();
   } catch (error) {
-    logger.warn({ error: error.message }, "OpenRouteService retornou JSON inválido");
+    logger.warn(
+      {
+        event: "routes.driving.invalid_json",
+        error: getErrorLogData(error),
+        durationMs: roundDurationMs(getDurationMs()),
+      },
+      "OpenRouteService retornou JSON inválido",
+    );
     throw unavailable("Serviço de rota indisponível");
   }
 
@@ -101,10 +141,24 @@ export const getDrivingRoute = async ({ start, end }) => {
   const safeCoordinates = Array.isArray(coordinates) ? coordinates : null;
 
   if (!safeCoordinates?.length) {
-    logger.warn("OpenRouteService retornou rota sem coordenadas");
+    logger.warn(
+      {
+        event: "routes.driving.empty_route",
+        durationMs: roundDurationMs(getDurationMs()),
+      },
+      "OpenRouteService retornou rota sem coordenadas",
+    );
     throw unavailable("Serviço de rota indisponível");
   }
 
   setCachedRoute(cacheKey, safeCoordinates);
+  logger.info(
+    {
+      event: "routes.driving.created",
+      coordinateCount: safeCoordinates.length,
+      durationMs: roundDurationMs(getDurationMs()),
+    },
+    "Rota criada pelo OpenRouteService",
+  );
   return safeCoordinates;
 };
