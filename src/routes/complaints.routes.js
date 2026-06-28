@@ -16,6 +16,7 @@ import {
   validateUpdateStatus,
   validateMapQuery,
   validateMapTileQuery,
+  validateMapTilesBatch,
   validateMapTilesIndexQuery,
   validateNearestQuery,
   validateRequestValidation,
@@ -50,6 +51,12 @@ router.post(
 );
 
 router.get("/", validateComplaintsQuery, wrap(complaintController.getAll));
+
+router.post(
+  "/map/tiles/batch",
+  validateMapTilesBatch,
+  wrap(complaintController.getMapTilesBatch),
+);
 
 router.get(
   "/map/tiles-index",

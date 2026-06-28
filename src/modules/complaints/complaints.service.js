@@ -18,6 +18,7 @@ import {
   getComplaintTileKeys,
   getMapTileBounds,
 } from "../map-tiles/map-tiles.util.js";
+import logger from "../../logger/index.js";
 
 const VALID_TRANSITIONS = {
   [COMPLAINT_STATUS.OPEN]: [COMPLAINT_STATUS.IN_PROGRESS],
@@ -62,6 +63,17 @@ const syncAndPublishMapTiles = async ({
     complaintId,
     action,
   });
+
+  logger.info(
+    {
+      event: "complaints.map_tiles.synced",
+      complaintId,
+      action,
+      tileCount: tileKeys.length,
+      status: nextComplaint?.status ?? previousComplaint?.status ?? null,
+    },
+    "Tiles do mapa sincronizados para denúncia",
+  );
 };
 
 export const create = async (complaintData, authenticatedUserId) => {
@@ -92,6 +104,16 @@ export const create = async (complaintData, authenticatedUserId) => {
     complaintId,
     action: "created",
   });
+
+  logger.info(
+    {
+      event: "complaints.created",
+      complaintId,
+      actorUserId: authenticatedUserId,
+      status: complaint.status,
+    },
+    "Denúncia criada",
+  );
 
   return {
     ...complaint,
@@ -140,6 +162,15 @@ export const patch = async (id, body, authenticatedUserId) => {
     message: "Uma denúncia que você acompanha foi atualizada.",
     sendPush: true,
   });
+  logger.info(
+    {
+      event: "complaints.updated",
+      complaintId: id,
+      actorUserId: authenticatedUserId,
+      status: updated.status,
+    },
+    "Denúncia atualizada",
+  );
   return await usersService.enrichWithCreatedByUsername(updated);
 };
 
@@ -177,6 +208,17 @@ export const updateStatus = async (complaintId, newStatus, authenticatedUserId) 
     sendPush: false,
   });
 
+  logger.info(
+    {
+      event: "complaints.status_updated",
+      complaintId,
+      actorUserId: authenticatedUserId,
+      previousStatus: currentStatus,
+      nextStatus: newStatus,
+    },
+    "Status da denúncia atualizado",
+  );
+
   return await usersService.enrichWithCreatedByUsername(updated);
 };
 
@@ -199,6 +241,16 @@ export const deleteComplaint = async (id, authenticatedUserId) => {
 
   await notificationsService.clearByComplaintId(id);
 
+  logger.info(
+    {
+      event: "complaints.deleted",
+      complaintId: id,
+      actorUserId: authenticatedUserId,
+      previousStatus: complaint.status,
+    },
+    "Denúncia excluída",
+  );
+
   return { message: "Denuncia excluida com sucesso" };
 };
 
@@ -219,6 +271,23 @@ export const findWithinBounds = async (bounds) => {
 export const findWithinTile = async (tile) => {
   const complaints = await complaintRepository.findWithinBounds(getTileBounds(tile));
   return await usersService.enrichWithCreatedByUsernames(complaints);
+};
+
+export const findWithinTiles = async ({ tiles, limit }) => {
+  return await Promise.all(
+    tiles.map(async (tile) => {
+      const complaints = await complaintRepository.findWithinBounds({
+        ...getTileBounds(tile),
+        limit,
+      });
+
+      return {
+        tileKey: `${tile.z}:${tile.x}:${tile.y}`,
+        tile,
+        items: await usersService.enrichWithCreatedByUsernames(complaints),
+      };
+    }),
+  );
 };
 
 export const getMapTilesIndex = async (query) => {
@@ -287,6 +356,15 @@ const openValidationByOwnerInactivityIfNeeded = async (complaintId) => {
       complaintId,
       actorUserId: null,
     });
+
+    logger.info(
+      {
+        event: "complaints.validation.auto_opened",
+        complaintId,
+        reasonType: OWNER_INACTIVE_REASON_TYPE,
+      },
+      "Validação aberta por inatividade do autor",
+    );
   }
 
   return result.complaint;
@@ -354,6 +432,17 @@ export const requestValidation = async (
     complaintId,
     actorUserId: authenticatedUserId,
   });
+
+  logger.info(
+    {
+      event: "complaints.validation.requested",
+      complaintId,
+      actorUserId: authenticatedUserId,
+      reasonType,
+      evidenceCount: evidenceIds?.length ?? 0,
+    },
+    "Validação de denúncia solicitada",
+  );
 
   return await usersService.enrichWithCreatedByUsername(updated);
 };
@@ -431,6 +520,16 @@ export const confirmResolution = async (complaintId, authenticatedUserId) => {
     message: `A denúncia "${complaint.title}" foi marcada como resolvida pelo autor.`,
     sendPush: false,
   });
+
+  logger.info(
+    {
+      event: "complaints.resolved",
+      complaintId,
+      actorUserId: authenticatedUserId,
+      validationCount: count,
+    },
+    "Denúncia marcada como resolvida",
+  );
 
   return await usersService.enrichWithCreatedByUsername(updated);
 };

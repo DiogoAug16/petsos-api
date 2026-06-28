@@ -9,6 +9,7 @@ import {
 
 const MAX_MAP_VIEWPORT_DELTA = 0.35;
 const MAX_MAP_TILE_INDEX_RADIUS_KM = 25;
+const MAX_MAP_BATCH_TILES = 12;
 
 const locationSchema = z.object({
   latitude: z.number().min(-90).max(90),
@@ -94,6 +95,26 @@ export const mapTileQuerySchema = z.object({
       message: "Tile Y inválido para o zoom informado",
       path: ["y"],
     }),
+});
+
+const mapTileBodySchema = z
+  .object({
+    z: z.coerce.number().int().min(10).max(18),
+    x: z.coerce.number().int().min(0),
+    y: z.coerce.number().int().min(0),
+  })
+  .refine((tile) => tile.x < 2 ** tile.z, {
+    message: "Tile X inválido para o zoom informado",
+    path: ["x"],
+  })
+  .refine((tile) => tile.y < 2 ** tile.z, {
+    message: "Tile Y inválido para o zoom informado",
+    path: ["y"],
+  });
+
+export const mapTilesBatchSchema = z.object({
+  tiles: z.array(mapTileBodySchema).min(1).max(MAX_MAP_BATCH_TILES),
+  limit: z.coerce.number().int().min(1).max(150).default(120),
 });
 
 export const mapTilesIndexQuerySchema = z.object({

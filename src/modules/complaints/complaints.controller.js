@@ -5,6 +5,8 @@ import { z } from "zod";
 import { complaintResponseSchema } from "../../schemas/complaint.schema.js";
 import { paginatedResponseSchema } from "../../schemas/pagination.schema.js";
 import { removeUploadedFiles } from "../../validators/upload.validator.js";
+import logger from "../../logger/index.js";
+import { createTimer, roundDurationMs } from "../../shared/utils/log.util.js";
 
 /** @type {import("express").RequestHandler} */
 export const create = async (req, res) => {
@@ -77,23 +79,89 @@ export const getNearest = async (req, res) => {
 
 /** @type {import("express").RequestHandler} */
 export const getMapComplaints = async (req, res) => {
+  const getDurationMs = createTimer();
   const complaints = await complaintService.findWithinBounds(req.validatedQuery);
   const responseData = z.array(complaintResponseSchema).parse(complaints);
+  logger.debug(
+    {
+      event: "complaints.map.bounds",
+      count: responseData.length,
+      durationMs: roundDurationMs(getDurationMs()),
+    },
+    "Denúncias do mapa consultadas por bounds",
+  );
   return success(res, responseData, StatusCodes.OK);
 };
 
 /** @type {import("express").RequestHandler} */
 export const getMapTileComplaints = async (req, res) => {
+  const getDurationMs = createTimer();
   const complaints = await complaintService.findWithinTile(req.validatedQuery);
   const responseData = z.array(complaintResponseSchema).parse(complaints);
   res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+  logger.debug(
+    {
+      event: "complaints.map.tile",
+      tile: {
+        z: req.validatedQuery.z,
+        x: req.validatedQuery.x,
+        y: req.validatedQuery.y,
+      },
+      count: responseData.length,
+      durationMs: roundDurationMs(getDurationMs()),
+    },
+    "Tile do mapa consultado",
+  );
   return success(res, responseData, StatusCodes.OK);
 };
 
 /** @type {import("express").RequestHandler} */
+export const getMapTilesBatch = async (req, res) => {
+  const getDurationMs = createTimer();
+  const tiles = await complaintService.findWithinTiles(req.validatedBody);
+  const responseData = z
+    .array(
+      z.object({
+        tileKey: z.string(),
+        tile: z.object({
+          z: z.number(),
+          x: z.number(),
+          y: z.number(),
+        }),
+        items: z.array(complaintResponseSchema),
+      }),
+    )
+    .parse(tiles);
+  res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=300");
+  logger.debug(
+    {
+      event: "complaints.map.tiles_batch",
+      requestedTiles: req.validatedBody.tiles.length,
+      returnedTiles: responseData.length,
+      totalComplaints: responseData.reduce((total, tile) => total + tile.items.length, 0),
+      durationMs: roundDurationMs(getDurationMs()),
+    },
+    "Batch de tiles do mapa consultado",
+  );
+  return success(res, { tiles: responseData }, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
 export const getMapTilesIndex = async (req, res) => {
+  const getDurationMs = createTimer();
   const items = await complaintService.getMapTilesIndex(req.validatedQuery);
   res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  logger.debug(
+    {
+      event: "complaints.map.tiles_index",
+      z: req.validatedQuery.z,
+      radiusKm: req.validatedQuery.radiusKm,
+      returnedTiles: items.length,
+      totalComplaints: items.reduce((total, item) => total + Number(item.count ?? 0), 0),
+      durationMs: roundDurationMs(getDurationMs()),
+    },
+    "Índice de tiles do mapa consultado",
+  );
   return success(res, { items }, StatusCodes.OK);
 };
 

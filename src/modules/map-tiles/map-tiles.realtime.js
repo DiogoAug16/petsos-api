@@ -23,11 +23,28 @@ export const setupMapTileRealtime = (server) => {
     client.on("pong", () => {
       client.isAlive = true;
     });
+    client.on("close", () => {
+      logger.debug(
+        {
+          event: "map_tiles.realtime.disconnected",
+          clients: webSocketServer.clients.size,
+        },
+        "Cliente desconectado do realtime de tiles",
+      );
+    });
 
     sendJson(client, {
       type: "connected",
       timestamp: Date.now(),
     });
+
+    logger.debug(
+      {
+        event: "map_tiles.realtime.connected",
+        clients: webSocketServer.clients.size,
+      },
+      "Cliente conectado ao realtime de tiles",
+    );
   });
 
   heartbeatTimer = setInterval(() => {
@@ -63,4 +80,15 @@ export const publishMapTileInvalidation = ({ tileKeys, complaintId, action }) =>
   for (const client of webSocketServer.clients) {
     sendJson(client, payload);
   }
+
+  logger.info(
+    {
+      event: "map_tiles.realtime.invalidated",
+      complaintId,
+      action,
+      tileCount: payload.tileKeys.length,
+      clients: webSocketServer.clients.size,
+    },
+    "Invalidação de tiles enviada",
+  );
 };
