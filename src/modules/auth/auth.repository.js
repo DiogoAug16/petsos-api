@@ -1,5 +1,6 @@
 import { db } from "../../config/firebase.js";
 import { env } from "../../config/env.js";
+import { DEFAULT_USER_ROLE } from "../../shared/constants/user-roles.js";
 
 const USERS_COLLECTION = `${env.firebase.collectionPrefix}users`;
 const USERNAMES_COLLECTION = `${env.firebase.collectionPrefix}usernames`;
@@ -74,6 +75,8 @@ export async function createUserProfileTransaction(uid, userData) {
       email: userData.email,
       name: userData.name,
       username: normalizedUsername,
+
+      role: DEFAULT_USER_ROLE,
 
       pushToken: null,
 
