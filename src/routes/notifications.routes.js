@@ -13,6 +13,9 @@ import {
 
 import * as notificationsController from "../modules/notifications/notifications.controller.js";
 
+import { USER_ROLES } from "../shared/constants/user-roles.js";
+import { authorizeRoles } from "../shared/middlewares/authorize-roles.middleware.js";
+
 const router = Router();
 
 /**
@@ -76,6 +79,7 @@ router.post(
   "/test",
   authenticateToken,
   requireVerifiedEmail,
+  authorizeRoles(USER_ROLES.ADMIN),
   wrap(notificationsController.createTestNotification),
 );
 
