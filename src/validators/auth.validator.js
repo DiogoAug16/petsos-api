@@ -39,6 +39,9 @@ export const validateCheckUsername = (req, res, next) => {
 };
 
 export const validateEmailBody = (req, res, next) => {
+  console.log("=== VALIDATE EMAIL BODY ===");
+  console.log("req.body:", req.body);
+  console.log("email recebido:", req.body?.email);
   const result = validateEmailSchema.safeParse({ body: req.body });
 
   if (!result.success) {

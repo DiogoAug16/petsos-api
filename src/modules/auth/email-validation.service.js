@@ -1,8 +1,10 @@
 import dns from "node:dns/promises";
+import nodeDns from "node:dns";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { InvalidEmailError } from "../../shared/errors/auth.error.js";
 
+nodeDns.setServers(["8.8.8.8", "1.1.1.1"]);
 const DOMAIN_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const DISPOSABLE_DOMAINS_PATH = fileURLToPath(
   new URL("../../config/blocklists/disposable-email-domains.conf", import.meta.url),

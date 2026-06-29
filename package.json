@@ -32,7 +32,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "firebase-admin": "^13.7.0",
+    "firebase-admin": "^13.10.0",
     "geofire-common": "^6.0.0",
     "helmet": "^8.2.0",
     "http-status-codes": "^2.3.0",
@@ -48,7 +48,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "autocannon": "^8.0.0",
+    "autocannon": "^2.0.1",
     "eslint": "^10.1.0",
     "globals": "^17.4.0",
     "husky": "^9.1.7",
