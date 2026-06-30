@@ -24,6 +24,13 @@ const complaintBaseSchema = z.object({
   location: locationSchema,
   photos: z.array(z.string()).optional(),
   thumbnailPhotos: z.array(z.string()).optional(),
+  isAnonymous: z
+    .preprocess((value) => {
+      if (value === true || value === "true") return true;
+      if (value === false || value === "false") return false;
+      return false;
+    }, z.boolean())
+    .default(false),
 });
 
 export const createComplaintSchema = complaintBaseSchema.refine(

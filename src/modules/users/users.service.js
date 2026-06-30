@@ -108,12 +108,15 @@ export const enrichWithUsername = async (item) => {
 export const enrichWithCreatedByUsernames = async (items) => {
   if (items.length === 0) return [];
 
-  const userIds = items.map((item) => item.createdById).filter(Boolean);
+  const visibleItems = items.filter((item) => !item.isAnonymous);
+  const userIds = visibleItems.map((item) => item.createdById).filter(Boolean);
   const usersById = await getUsernamesByIds(userIds);
 
   return items.map((item) => ({
     ...item,
-    createdByUsername: usersById.get(item.createdById) ?? null,
+    createdByUsername: item.isAnonymous
+      ? null
+      : (usersById.get(item.createdById) ?? null),
   }));
 };
 
