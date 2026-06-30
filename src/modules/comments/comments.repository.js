@@ -119,3 +119,47 @@ export const getByComplaintId = async ({ complaintId, limit, cursor }) => {
     },
   };
 };
+
+export const deleteComment = async ({ complaintId, commentId, deletedBy }) => {
+  const commentRef = commentsCollection().doc(commentId);
+  const deletedAt = new Date();
+  let deletedComment = null;
+
+  await db.runTransaction(async (transaction) => {
+    const commentDoc = await transaction.get(commentRef);
+
+    if (!commentDoc.exists || commentDoc.data()?.complaintId !== complaintId) {
+      throw new NotFoundError(ERROR_CODES.COMMENT_NOT_FOUND);
+    }
+
+    const comment = commentDoc.data();
+
+    if (comment.deletedAt) {
+      deletedComment = serialize(commentDoc.id, comment);
+      return;
+    }
+
+    const update = {
+      publicVisibility: COMPLAINT_PUBLIC_VISIBILITY.HIDDEN,
+      deletedAt,
+      deletedBy,
+      updatedAt: deletedAt,
+    };
+
+    transaction.update(commentRef, update);
+
+    if (comment.parentCommentId) {
+      const parentRef = commentsCollection().doc(comment.parentCommentId);
+      transaction.update(parentRef, {
+        repliesCount: admin.firestore.FieldValue.increment(-1),
+      });
+    }
+
+    deletedComment = serialize(commentDoc.id, {
+      ...comment,
+      ...update,
+    });
+  });
+
+  return deletedComment;
+};

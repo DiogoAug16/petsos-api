@@ -4,6 +4,7 @@ import {
   COMPLAINT_PUBLIC_VISIBILITY,
   isComplaintPubliclyVisible,
 } from "../../shared/types/complaint.visibility.js";
+import { USER_ROLES } from "../../shared/constants/user-roles.js";
 import { deleteFiles } from "../../shared/helpers/file.helper.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
@@ -259,9 +260,13 @@ export const updateStatus = async (complaintId, newStatus, authenticatedUserId) 
 
 export const deleteComplaint = async (id, authenticatedUserId) => {
   const complaint = await complaintRepository.getDetail(id);
+  const authenticatedUserRole = await usersService.getRoleById(authenticatedUserId);
+  const canDeleteComplaint =
+    complaint.createdById === authenticatedUserId ||
+    authenticatedUserRole === USER_ROLES.ADMIN;
 
-  if (complaint.createdById !== authenticatedUserId) {
-    throw new ForbiddenError("Apenas o criador pode excluir esta denuncia");
+  if (!canDeleteComplaint) {
+    throw new ForbiddenError("Apenas o criador ou um admin pode excluir esta denuncia");
   }
 
   await deleteFiles(complaint.photos);

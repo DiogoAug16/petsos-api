@@ -11,6 +11,8 @@ import {
 } from "../shared/middlewares/auth.middleware.js";
 import { wrap } from "../shared/utils/async-handler.util.js";
 import { rateLimit } from "../shared/middlewares/rate-limit.middleware.js";
+import { USER_ROLES } from "../shared/constants/user-roles.js";
+import { authorizeRoles } from "../shared/middlewares/authorize-roles.middleware.js";
 
 const router = Router({ mergeParams: true });
 const commentReportRateLimit = rateLimit({
@@ -58,6 +60,15 @@ router.delete(
   requireVerifiedEmail,
   commentLikesValidator.validateCommentLike,
   wrap(commentLikesController.unlike),
+);
+
+router.delete(
+  "/:commentId",
+  authenticateToken,
+  requireVerifiedEmail,
+  authorizeRoles(USER_ROLES.ADMIN),
+  commentsValidator.validateDeleteComment,
+  wrap(commentsController.deleteComment),
 );
 
 router.get(

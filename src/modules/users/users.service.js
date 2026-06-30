@@ -1,6 +1,7 @@
 import * as usersRepository from "./users.repository.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import { deleteFiles } from "../../shared/helpers/file.helper.js";
+import { getUserRole } from "../../shared/utils/user-role.js";
 import logger from "../../logger/index.js";
 
 const toPublicProfile = (profile) => ({
@@ -39,6 +40,11 @@ export const getPublicProfileById = async (userId) => {
   }
 
   return toPublicProfile(profile);
+};
+
+export const getRoleById = async (userId) => {
+  const profile = await usersRepository.getUserById(userId);
+  return getUserRole(profile);
 };
 
 export const updateCurrentProfile = async (

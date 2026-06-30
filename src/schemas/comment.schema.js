@@ -35,6 +35,12 @@ export const reportCommentSchema = z.object({
   }),
 });
 
+export const deleteCommentSchema = z.object({
+  params: idParamSchema.extend({
+    commentId: z.string({ required_error: "commentId é obrigatório" }).trim().min(1),
+  }),
+});
+
 export const baseCommentResponseSchema = z.object({
   id: z.string(),
   complaintId: z.string(),

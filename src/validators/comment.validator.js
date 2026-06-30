@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   createCommentSchema,
+  deleteCommentSchema,
   getCommentsSchema,
   reportCommentSchema,
 } from "../schemas/comment.schema.js";
@@ -60,6 +61,24 @@ export const validateReportComment = (req, res, next) => {
     complaintId: result.data.params.id,
     commentId: result.data.params.commentId,
     reason: result.data.body.reason ?? null,
+  };
+
+  next();
+};
+
+export const validateDeleteComment = (req, res, next) => {
+  const result = deleteCommentSchema.safeParse({
+    params: req.params,
+  });
+
+  if (!result.success) {
+    const errors = z.flattenError(result.error);
+    throw new ValidationError(errors, ERROR_CODES.COMMENT_VALIDATION);
+  }
+
+  req.validatedDeleteCommentData = {
+    complaintId: result.data.params.id,
+    commentId: result.data.params.commentId,
   };
 
   next();

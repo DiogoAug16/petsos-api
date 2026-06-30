@@ -37,3 +37,13 @@ export const report = async (req, res) => {
   const responseData = complaintModerationResponseSchema.parse(moderation);
   return success(res, responseData, StatusCodes.CREATED);
 };
+
+/** @type {import("express").RequestHandler} */
+export const deleteComment = async (req, res) => {
+  const result = await commentsService.deleteComment({
+    ...req.validatedDeleteCommentData,
+    adminId: req.userId,
+  });
+
+  return success(res, result, StatusCodes.OK);
+};
