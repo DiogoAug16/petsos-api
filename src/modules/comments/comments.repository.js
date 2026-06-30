@@ -3,6 +3,7 @@ import { db } from "../../config/firebase.js";
 import { env } from "../../config/env.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
+import { COMPLAINT_PUBLIC_VISIBILITY } from "../../shared/types/complaint.visibility.js";
 import { paginateFirestore } from "../../shared/helpers/paginate.helper.js";
 import { commentsCursorSchema } from "../../schemas/pagination.schema.js";
 import { serialize, timestampToMillis } from "../../shared/utils/firestore.util.js";
@@ -64,6 +65,11 @@ const countCommentsByComplaintId = async (complaintId) => {
   return snapshot.data().count;
 };
 
+const isPublicComment = (comment) =>
+  !comment.deletedAt &&
+  (comment.publicVisibility == null ||
+    comment.publicVisibility === COMPLAINT_PUBLIC_VISIBILITY.VISIBLE);
+
 export const create = async ({ complaintId, userId, text }) => {
   const docRef = commentsCollection().doc();
   const complaintRef = complaintsCollection().doc(complaintId);
@@ -106,9 +112,54 @@ export const getByComplaintId = async ({ complaintId, limit, cursor }) => {
 
   return {
     ...commentsPage,
+    items: commentsPage.items.filter(isPublicComment),
     pageInfo: {
       ...commentsPage.pageInfo,
       totalItems,
     },
   };
+};
+
+export const deleteComment = async ({ complaintId, commentId, deletedBy }) => {
+  const commentRef = commentsCollection().doc(commentId);
+  const deletedAt = new Date();
+  let deletedComment = null;
+
+  await db.runTransaction(async (transaction) => {
+    const commentDoc = await transaction.get(commentRef);
+
+    if (!commentDoc.exists || commentDoc.data()?.complaintId !== complaintId) {
+      throw new NotFoundError(ERROR_CODES.COMMENT_NOT_FOUND);
+    }
+
+    const comment = commentDoc.data();
+
+    if (comment.deletedAt) {
+      deletedComment = serialize(commentDoc.id, comment);
+      return;
+    }
+
+    const update = {
+      publicVisibility: COMPLAINT_PUBLIC_VISIBILITY.HIDDEN,
+      deletedAt,
+      deletedBy,
+      updatedAt: deletedAt,
+    };
+
+    transaction.update(commentRef, update);
+
+    if (comment.parentCommentId) {
+      const parentRef = commentsCollection().doc(comment.parentCommentId);
+      transaction.update(parentRef, {
+        repliesCount: admin.firestore.FieldValue.increment(-1),
+      });
+    }
+
+    deletedComment = serialize(commentDoc.id, {
+      ...comment,
+      ...update,
+    });
+  });
+
+  return deletedComment;
 };

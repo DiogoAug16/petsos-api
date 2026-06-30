@@ -1,219 +1,229 @@
-# 🐾 PetSOS — Backend
+# PetSOS — Backend API
 
-API REST do aplicativo **PetSOS**, uma plataforma colaborativa de denúncias de maus-tratos contra animais. Construída com **Node.js + Express**, organizada em monorepo junto ao frontend mobile (React Native + Expo).
+API REST do **PetSOS**, responsável por autenticação complementar, perfis, denúncias, mapa, uploads, notificações, comentários, evidências, rotas, moderação e observabilidade. O backend é construído com **Node.js + Express 5**, usa **Firebase Admin + Firestore** como camada de dados e atende o app mobile do repositório `petsos`.
 
----
+## Responsabilidades da API
 
-## 🗂️ Estrutura do Projeto
+- Validar payloads e centralizar regras de negócio.
+- Garantir permissões de usuário, admin e fluxos públicos.
+- Persistir denúncias, usuários, seguidores, voluntários, notificações e comentários no Firestore.
+- Processar uploads e gerar thumbnails.
+- Expor consultas de mapa por geohash, tiles, índice e batch.
+- Fazer proxy seguro para OpenRouteService.
+- Servir autocomplete de cidades via IBGE com cache.
+- Gerenciar reportes e decisões administrativas.
+- Expor logs, métricas e documentação OpenAPI.
 
-```
-backend/
-├── src/
-│   ├── config/
-│   ├── modules/
-│   │   ├── complaints/
-│   │   └── users/
-│   ├── routes/
-│   ├── schemas/
-│   ├── shared/
-│   │   ├── helpers/
-│   │   ├── middlewares/
-│   │   ├── utils/
-│   │   ├── errors/
-│   │   └── types/
-│   └── validators/
-│
-├── .env.example
-├── .gitignore
-├── package.json
-├── README.md
-└── server.js
-```
+## Stack principal
 
----
+| Tecnologia       | Uso                                          |
+| ---------------- | -------------------------------------------- |
+| Node.js          | Runtime da API                               |
+| Express 5        | Framework HTTP                               |
+| Firebase Admin   | Autenticação de tokens e acesso ao Firestore |
+| Firestore        | Banco principal                              |
+| Zod              | Validação de schemas                         |
+| Multer           | Upload multipart                             |
+| Sharp            | Geração de thumbnails                        |
+| Helmet / CORS    | Hardening HTTP                               |
+| Pino / Pino HTTP | Logs estruturados                            |
+| prom-client      | Métricas Prometheus                          |
+| Swagger UI       | Documentação interativa da API               |
+| geofire-common   | Consultas geográficas por geohash            |
+| ws               | Realtime de invalidação de tiles             |
+| Autocannon       | Benchmarks locais                            |
 
-## 📁 Descrição das Pastas
+## Estrutura do projeto
 
-### `src/config/`
-
-Centraliza todas as configurações globais de bibliotecas e ambiente.
-
-| Arquivo         | Responsabilidade                             |
-| --------------- | -------------------------------------------- |
-| `firebase.js`   | Inicializa o Firebase Admin SDK (Firestore)  |
-| `storage.js`    | Configuração específica para salvar arquivos |
-| `env.js`        | Leitura das variáveis de ambiente            |
-| `zod.config.js` | Configuração global e customizações do Zod   |
-
----
-
-### `src/modules/`
-
-Coração da aplicação. Cada módulo representa um **domínio de negócio** do PetSOS e é totalmente autocontido, seguindo a estrutura:
-
-```
-modules/
-└── <nome-do-modulo>/
-    ├── <nome>.controller.js   # Recebe a requisição e devolve a resposta HTTP
-    ├── <nome>.service.js      # Contém as regras de negócio
-    └── <nome>.repository.js   # Acesso ao banco de dados
+```txt
+petsos-api/
+  src/routes/          Rotas HTTP e middlewares por recurso
+  src/modules/         Controllers, services e repositories por domínio
+  src/schemas/         Schemas Zod de entrada
+  src/validators/      Upload, auth e validações de request
+  src/shared/          Erros, helpers, middlewares, utils e tipos
+  src/config/          Firebase, env, Swagger, métricas e integrações
+  src/logger/          Logger da aplicação
+  scripts/             Backfills e manutenção operacional
+  uploads/             Arquivos locais em produção
 ```
 
-#### Módulos ativos/previstos:
+## Módulos principais
 
-**`modules/complaints/`** — Denúncias _(Sprint 1 — Alta prioridade)_
+| Módulo                                           | Responsabilidade                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------------------ |
+| `auth`                                           | Completar perfil, validar username, validar email e domínios temporários |
+| `users`                                          | Perfil privado, perfil público, edição de perfil e foto                  |
+| `complaints`                                     | CRUD, paginação, mapa, nearest, tiles e status                           |
+| `complaint-followers`                            | Acompanhamento de denúncias                                              |
+| `complaint-volunteers`                           | Voluntariado em denúncias                                                |
+| `complaint-evidence`                             | Evidências e fotos de resolução                                          |
+| `complaint-votes` / `complaint-validations`      | Votação e validação de resolução                                         |
+| `comments` / `comment-replies` / `comment-likes` | Comentários, respostas, likes e reportes                                 |
+| `notifications`                                  | Lista, contador, leitura e limpeza                                       |
+| `complaint-moderations`                          | Fila admin, denúncias reportadas e comentários reportados                |
+| `map-tiles`                                      | Estatísticas, batch, cache e invalidação realtime dos tiles              |
+| `routes`                                         | Rotas por ruas usando OpenRouteService                                   |
+| `locations`                                      | Autocomplete de cidades via IBGE com cache                               |
+| `app`                                            | Bootstrap inicial do app                                                 |
 
-- Criar denúncia com descrição e localização
-- Anexar fotos como evidência
-- Editar e excluir denúncia
-- Listar todas as denúncias
+## Endpoints importantes
 
-**`modules/users/`** — Usuários _(Sprint 4)_
+### Bootstrap e perfil
 
-- Criar conta e autenticação
-- Login, logout e recuperação de senha
+- `GET /api/app/bootstrap`
+- `GET /api/users/me/summary`
+- `GET /api/users/:username/profile-summary`
+- `PATCH /api/users/me`
 
----
+### Denúncias e mapa
 
-### `src/routes/`
+- `GET /api/complaints?limit=20`
+- `POST /api/complaints`
+- `GET /api/complaints/:id`
+- `PATCH /api/complaints/:id`
+- `DELETE /api/complaints/:id`
+- `GET /api/complaints/nearest`
+- `GET /api/complaints/map/tiles-index`
+- `POST /api/complaints/map/tiles/batch`
+- `GET /api/complaints/map/tiles/events`
 
-Define e agrupa todas as rotas da API, conectando as URLs aos controllers de cada módulo.
+### Comunidade e moderação
 
-```
-routes/
-├── index.js               # Ponto central que registra todas as rotas no Express
-├── complaints.routes.js   # Rotas de denúncias com middlewares de validação
-```
+- `POST /api/complaints/:id/followers`
+- `POST /api/complaints/:id/volunteers`
+- `GET /api/notifications`
+- `GET /api/notifications/unread-count`
+- `POST /api/complaints/:id/report`
+- `GET /api/complaints/moderation/pending`
+- `POST /api/complaints/:id/moderation/approve`
+- `POST /api/complaints/:id/moderation/reject`
+- `POST /api/complaints/:id/moderation/hide`
 
-**Convenção de rotas:**
+### Integrações
 
-| Método   | Rota                  | Descrição                |
-| -------- | --------------------- | ------------------------ |
-| `POST`   | `/api/complaints`     | Criar denúncia           |
-| `GET`    | `/api/complaints`     | Listar denúncias         |
-| `GET`    | `/api/complaints/:id` | Detalhes de uma denúncia |
-| `PATCH`  | `/api/complaints/:id` | Editar denúncia          |
-| `DELETE` | `/api/complaints/:id` | Excluir denúncia         |
+- `GET /api/routes/driving`
+- `GET /api/locations/cities`
+- `GET /api/openapi.json`
+- `GET /api/docs`
+- `GET /api/metrics`
 
----
+## Segurança
 
-### `src/shared/`
+- Firebase Auth valida a identidade; o backend é a autoridade final das permissões.
+- Rotas sensíveis exigem autenticação e, quando necessário, role `admin`.
+- Usuários convidados podem visualizar denúncias públicas, fotos e seguidores.
+- Usuários não verificados podem acompanhar denúncias e receber notificações, mas ações mais sensíveis continuam bloqueadas.
+- Payloads são validados com Zod.
+- Uploads validam tipo, tamanho e processamento.
+- Chaves externas, como OpenRouteService, ficam apenas no backend.
+- Reportes possuem rate limit.
+- Email temporário é bloqueado com lista local e domínio é validado por DNS/MX.
 
-Código reutilizável compartilhado entre todos os módulos.
+## Otimizações
 
----
+- Paginação de denúncias com cursor.
+- Geohash para `/nearest` e consultas geográficas.
+- Índice de tiles para o app saber quais regiões possuem denúncias.
+- Batch endpoint para buscar múltiplos tiles em uma única request.
+- Invalidação realtime quando denúncias são criadas, editadas, resolvidas ou apagadas.
+- Thumbnails com Sharp para reduzir peso de imagens no app.
+- Endpoints agregados de perfil e bootstrap para reduzir round-trips.
+- Benchmarks com Autocannon para rotas críticas.
 
-#### `src/shared/middlewares/`
+## Observabilidade
 
-Funções que interceptam o ciclo de requisição/resposta do Express.
-
-| Arquivo                | Responsabilidade                                   |
-| ---------------------- | -------------------------------------------------- |
-| `upload.middleware.js` | Processa o upload de fotos para o disco local      |
-| `error.middleware.js`  | Middleware global para captura e resposta de erros |
-
----
-
-#### `src/shared/helpers/`
-
-Funções que auxiliam em lógicas específicas de negócio ou operações complexas.
-
-| Arquivo          | Responsabilidade                                          |
-| ---------------- | --------------------------------------------------------- |
-| `file.helper.js` | Auxilia na manipulação de arquivos (ex: deleção de fotos) |
-
----
-
-#### `src/shared/utils/`
-
-Abstrações técnicas e funções puras para padronização e reuso de código.
-
-| Arquivo                 | Responsabilidade                                                |
-| ----------------------- | --------------------------------------------------------------- |
-| `async-handler.util.js` | Utilitário para capturar erros em controllers assíncronos (HOF) |
-| `firestore.util.js`     | Serialização de dados provenientes do Firestore                 |
-| `response.util.js`      | Padroniza o formato de resposta da API (`{ success, data }`)    |
-
----
-
-#### `src/shared/errors/`
-
-Centraliza a definição de exceções customizadas da aplicação.
-
-| Arquivo                    | Responsabilidade                                    |
-| -------------------------- | --------------------------------------------------- |
-| `app.error.js`             | Classe base para erros operacionais                 |
-| `error.codes.js`           | Dicionário de códigos de erro para o frontend       |
-| `not_found.error.js`       | Erro específico para recursos não encontrados (404) |
-| `validation.error.js`      | Erro formatado para falhas de validação (400)       |
-| `internal_server.error.js` | Erro genérico para falhas inesperadas (500)         |
-
----
-
-#### `src/shared/types/`
-
-Enums, constantes e códigos de erros que evitam o uso de "strings mágicas".
-
-| Arquivo                | Conteúdo                                            |
-| ---------------------- | --------------------------------------------------- |
-| `complaint.status.js`  | Status: `aberto`, `fechado`, `resolvido`            |
-| `complaint.animals.js` | Tipos de animais: `cachorro`, `gato`, `passaro` etc |
-| `complaint.types.js`   | Tipos de denúncia: `abandono`, `violencia` etc      |
-| `error.codes.js`       | Dicionário de códigos de erro para o frontend       |
-
----
-
-## 🚀 Como rodar localmente
+- Logs estruturados com Pino e Pino HTTP.
+- Swagger UI para consultar contratos da API.
+- Métricas Prometheus em `/api/metrics`, protegidas por `METRICS_TOKEN`.
+- Scripts de benchmark:
 
 ```bash
-# Na raiz do monorepo
-cd backend
-
-# Instalar dependências
-npm install
-
-# Configurar variáveis de ambiente
-cp .env.example .env
-
-# Rodar em desenvolvimento
-npm run dev
+npm run bench
+npm run bench:complaints
+npm run bench:map-index
+npm run bench:openapi
 ```
 
----
+## Variáveis de ambiente
 
-## 🔑 Variáveis de Ambiente (`.env.example`)
+Crie um `.env` baseado em `.env.example`.
 
 ```env
-PORT=3000
+PORT=3030
 NODE_ENV=development
+FIREBASE_COLLECTION_PREFIX=dev_
 
-# Firebase
 FIREBASE_PROJECT_ID=
 FIREBASE_PRIVATE_KEY=
 FIREBASE_CLIENT_EMAIL=
-FIREBASE_STORAGE_BUCKET=
-FIREBASE_COLLECTION_PREFIX=
+
+OPENROUTESERVICE_API_KEY=
+CORS_ORIGIN=
+UPLOADS_MAX_BYTES=2147483648
+METRICS_TOKEN=
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=admin
 ```
 
----
+Observações:
 
-## 📦 Dependências principais
+- O app mobile normalmente aponta para `/api`, então confira proxy/nginx em produção.
+- `METRICS_TOKEN` deve ser definido antes de expor `/api/metrics`.
+- `OPENROUTESERVICE_API_KEY` deve ficar somente no backend.
+- Em produção, fotos ficam localmente no servidor em `/uploads`.
 
-| Pacote           | Uso                                 |
-| ---------------- | ----------------------------------- |
-| `express`        | Framework HTTP                      |
-| `dotenv`         | Leitura de variáveis de ambiente    |
-| `firebase-admin` | Acesso ao Firestore (banco)         |
-| `multer`         | Processamento de upload de arquivos |
-| `zod`            | Validação de schemas e tipos        |
+## Como rodar
 
----
+```bash
+npm install
+npm run dev
+```
 
-## 🗺️ Roadmap por Sprint (BACKEND)
+Comandos úteis:
 
-| Sprint   | Módulos envolvidos                                     | Status       |
-| -------- | ------------------------------------------------------ | ------------ |
-| Sprint 1 | `complaints` (CRUD + geolocalização + upload de fotos) | ✅ Concluído |
-| Sprint 2 | `complaints` (filtros + mapa) + `collaborations`       | 🔲 Backlog   |
-| Sprint 3 | `complaints` (status + histórico) + `validations`      | 🔲 Backlog   |
-| Sprint 4 | `users` (auth completa)                                | 🔲 Backlog   |
+```bash
+npm start
+npm test
+npm run lint:check
+npm run lint:fix
+npm run bench
+```
+
+## Scripts de manutenção
+
+```bash
+npm run backfill:complaint-geohashes
+npm run backfill:complaint-public-visibility
+npm run backfill:map-tile-stats
+npm run backfill:complaint-thumbnails
+```
+
+Use esses scripts após mudanças de modelo, criação de novos índices ou migrações de dados antigos.
+
+## Índices Firestore
+
+Algumas consultas exigem índices compostos, principalmente:
+
+- denúncias públicas ordenadas por criação;
+- geohash com visibilidade pública;
+- paginação e filtros do mapa;
+- coleções com prefixo configurado por `FIREBASE_COLLECTION_PREFIX`.
+
+Depois de alterar `firebase.indexes.json`, faça o deploy dos índices no projeto correto do Firebase antes de testar rotas dependentes.
+
+## Validação antes de PR
+
+```bash
+npm run lint:check
+npm test
+npm run bench
+```
+
+Para mudanças de mapa ou Firestore, valide também:
+
+- `/api/complaints/map/tiles-index`;
+- `/api/complaints/map/tiles/batch`;
+- `/api/complaints/nearest`;
+- realtime de tiles;
+- criação, edição e exclusão de denúncia.

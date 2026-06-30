@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as complaintController from "../modules/complaints/complaints.controller.js";
+import * as complaintModerationsController from "../modules/complaint-moderations/complaint-moderations.controller.js";
 import * as complaintEvidenceController from "../modules/complaint-evidence/complaint-evidence.controller.js";
 import * as complaintVotesController from "../modules/complaint-votes/complaint-votes.controller.js";
 import * as complaintValidationsController from "../modules/complaint-validations/complaint-validations.controller.js";
@@ -19,6 +20,8 @@ import {
   validateMapTilesBatch,
   validateMapTilesIndexQuery,
   validateNearestQuery,
+  validateModerationAction,
+  validateReportComplaint,
   validateRequestValidation,
 } from "../validators/complaint.validator.js";
 import {
@@ -30,12 +33,20 @@ import {
   authenticateToken,
   requireVerifiedEmail,
 } from "../shared/middlewares/auth.middleware.js";
+import { USER_ROLES } from "../shared/constants/user-roles.js";
+import { authorizeRoles } from "../shared/middlewares/authorize-roles.middleware.js";
 import { rateLimit } from "../shared/middlewares/rate-limit.middleware.js";
 
 const uploadRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 40,
   keyPrefix: "uploads",
+});
+
+const reportRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  keyPrefix: "complaint_reports",
 });
 
 const router = Router();
@@ -51,6 +62,32 @@ router.post(
 );
 
 router.get("/", validateComplaintsQuery, wrap(complaintController.getAll));
+
+router.get(
+  "/moderation/pending",
+  authenticateToken,
+  requireVerifiedEmail,
+  authorizeRoles(USER_ROLES.ADMIN),
+  validateComplaintsQuery,
+  wrap(complaintModerationsController.getPending),
+);
+
+router.get(
+  "/admin",
+  authenticateToken,
+  requireVerifiedEmail,
+  authorizeRoles(USER_ROLES.ADMIN),
+  validateComplaintsQuery,
+  wrap(complaintController.getAdminAll),
+);
+
+router.get(
+  "/admin/:id",
+  authenticateToken,
+  requireVerifiedEmail,
+  authorizeRoles(USER_ROLES.ADMIN),
+  wrap(complaintController.getAdminDetail),
+);
 
 router.post(
   "/map/tiles/batch",
@@ -126,6 +163,42 @@ router.get(
   "/:id/votes/evidence-selection/status",
   authenticateToken,
   wrap(complaintVotesController.getEvidenceSelectionStatus),
+);
+
+router.post(
+  "/:id/report",
+  authenticateToken,
+  requireVerifiedEmail,
+  reportRateLimit,
+  validateReportComplaint,
+  wrap(complaintModerationsController.reportComplaint),
+);
+
+router.patch(
+  "/:id/moderation/approve",
+  authenticateToken,
+  requireVerifiedEmail,
+  authorizeRoles(USER_ROLES.ADMIN),
+  validateModerationAction,
+  wrap(complaintModerationsController.approve),
+);
+
+router.patch(
+  "/:id/moderation/reject",
+  authenticateToken,
+  requireVerifiedEmail,
+  authorizeRoles(USER_ROLES.ADMIN),
+  validateModerationAction,
+  wrap(complaintModerationsController.reject),
+);
+
+router.patch(
+  "/:id/moderation/hide",
+  authenticateToken,
+  requireVerifiedEmail,
+  authorizeRoles(USER_ROLES.ADMIN),
+  validateModerationAction,
+  wrap(complaintModerationsController.hide),
 );
 
 router.post(

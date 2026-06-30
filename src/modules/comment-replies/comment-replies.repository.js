@@ -3,6 +3,7 @@ import { db } from "../../config/firebase.js";
 import { env } from "../../config/env.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
 import { ERROR_CODES } from "../../shared/types/error.codes.js";
+import { COMPLAINT_PUBLIC_VISIBILITY } from "../../shared/types/complaint.visibility.js";
 import { paginateFirestore } from "../../shared/helpers/paginate.helper.js";
 import { commentsCursorSchema } from "../../schemas/pagination.schema.js";
 import { serialize, timestampToMillis } from "../../shared/utils/firestore.util.js";
@@ -101,6 +102,11 @@ const getRepliesPage = async ({ complaintId, parentCommentId, limit, cursor }) =
   });
 };
 
+const isPublicComment = (comment) =>
+  !comment.deletedAt &&
+  (comment.publicVisibility == null ||
+    comment.publicVisibility === COMPLAINT_PUBLIC_VISIBILITY.VISIBLE);
+
 export const create = async ({ complaintId, commentId, userId, text }) => {
   const docRef = commentsCollection().doc();
   const complaintRef = complaintsCollection().doc(complaintId);
@@ -147,10 +153,15 @@ export const getByCommentId = async ({ complaintId, commentId, limit, cursor }) 
 
   const topLevelCommentId = getTopLevelCommentId(commentDoc);
 
-  return await getRepliesPage({
+  const repliesPage = await getRepliesPage({
     complaintId,
     parentCommentId: topLevelCommentId,
     limit,
     cursor,
   });
+
+  return {
+    ...repliesPage,
+    items: repliesPage.items.filter(isPublicComment),
+  };
 };

@@ -1,6 +1,7 @@
 import { db, FieldValue } from "../../config/firebase.js";
 import { env } from "../../config/env.js";
 import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
+import { isComplaintPubliclyVisible } from "../../shared/types/complaint.visibility.js";
 import { serialize } from "../../shared/utils/firestore.util.js";
 import { getComplaintTiles, getMapTileKey, parseMapTileKey } from "./map-tiles.util.js";
 
@@ -22,6 +23,7 @@ const getStatusCounterField = (status) => {
 
 const getComplaintTileStats = (complaint) => {
   if (!complaint) return new Map();
+  if (!isComplaintPubliclyVisible(complaint)) return new Map();
 
   return new Map(
     getComplaintTiles(complaint).map((tile) => [

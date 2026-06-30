@@ -19,6 +19,7 @@ export const openApiSpec = {
     { name: "Auth" },
     { name: "Users" },
     { name: "Complaints" },
+    { name: "Moderation" },
     { name: "Map" },
     { name: "Notifications" },
     { name: "Routes" },
@@ -67,6 +68,14 @@ export const openApiSpec = {
       },
       ValidationError: {
         description: "Payload ou parâmetros inválidos",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/ApiError" },
+          },
+        },
+      },
+      Forbidden: {
+        description: "Usuário sem permissão para acessar o recurso",
         content: {
           "application/json": {
             schema: { $ref: "#/components/schemas/ApiError" },
@@ -318,6 +327,165 @@ export const openApiSpec = {
         responses: {
           200: { description: "Denúncia excluída" },
           401: { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/complaints/{id}/report": {
+      post: {
+        tags: ["Complaints"],
+        summary: "Reporta uma denúncia para moderação administrativa",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  reason: { type: "string", maxLength: 500, nullable: true },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: { description: "Reporte registrado" },
+          400: { $ref: "#/components/responses/ValidationError" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          409: { description: "Usuário já reportou esta denúncia" },
+        },
+      },
+    },
+    "/complaints/moderation/pending": {
+      get: {
+        tags: ["Moderation"],
+        summary: "Lista denúncias aguardando moderação",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", example: 20 },
+          },
+          {
+            name: "cursor",
+            in: "query",
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          200: { description: "Pendências retornadas" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+    "/complaints/admin": {
+      get: {
+        tags: ["Moderation"],
+        summary: "Lista denúncias para administração, incluindo ocultas",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", example: 20 },
+          },
+          {
+            name: "cursor",
+            in: "query",
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          200: { description: "Página administrativa retornada" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+    "/complaints/admin/{id}": {
+      get: {
+        tags: ["Moderation"],
+        summary: "Detalha denúncia para administração, incluindo ocultas",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          200: { description: "Denúncia administrativa retornada" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { description: "Denúncia não encontrada" },
+        },
+      },
+    },
+    "/complaints/{id}/moderation/approve": {
+      patch: {
+        tags: ["Moderation"],
+        summary: "Aprova denúncia reportada",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  reason: { type: "string", maxLength: 500, nullable: true },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Denúncia aprovada" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+    "/complaints/{id}/moderation/reject": {
+      patch: {
+        tags: ["Moderation"],
+        summary: "Rejeita denúncia reportada e remove das consultas públicas",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          200: { description: "Denúncia rejeitada" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+    "/complaints/{id}/moderation/hide": {
+      patch: {
+        tags: ["Moderation"],
+        summary: "Oculta denúncia reportada das consultas públicas",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          200: { description: "Denúncia ocultada" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
         },
       },
     },

@@ -3,6 +3,8 @@ import { success } from "../../shared/utils/response.util.js";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
 import {
+  adminComplaintResponseSchema,
+  adminComplaintSummarySchema,
   complaintResponseSchema,
   publicComplaintSummarySchema,
 } from "../../schemas/complaint.schema.js";
@@ -36,9 +38,25 @@ export const getAll = async (req, res) => {
 };
 
 /** @type {import("express").RequestHandler} */
+export const getAdminAll = async (req, res) => {
+  const complaints = await complaintService.getAdminAll(req.validatedQuery);
+  const responseData = paginatedResponseSchema(adminComplaintSummarySchema).parse(
+    complaints,
+  );
+  return success(res, responseData, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
 export const getDetail = async (req, res) => {
   const complaint = await complaintService.getDetail(req.params.id);
   const responseData = complaintResponseSchema.parse(complaint);
+  return success(res, responseData, StatusCodes.OK);
+};
+
+/** @type {import("express").RequestHandler} */
+export const getAdminDetail = async (req, res) => {
+  const complaint = await complaintService.getAdminDetail(req.params.id);
+  const responseData = adminComplaintResponseSchema.parse(complaint);
   return success(res, responseData, StatusCodes.OK);
 };
 

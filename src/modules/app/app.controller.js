@@ -8,10 +8,10 @@ import { currentUserSummarySchema } from "../../schemas/user.schema.js";
 export const bootstrap = async (req, res) => {
   const profile = await usersService.getPublicProfileById(req.userId);
   const [followedSummary, unreadNotifications] = await Promise.all([
-    complaintService.getFollowedSummaryByUsername(profile.username),
-    req.emailVerified
-      ? notificationsService.countUnread(req.userId)
-      : Promise.resolve({ count: 0 }),
+    complaintService.getFollowedSummaryByUsername(profile.username, {
+      viewerUserId: req.userId,
+    }),
+    notificationsService.countUnread(req.userId),
   ]);
 
   const summary = currentUserSummarySchema.parse({

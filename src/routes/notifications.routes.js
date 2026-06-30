@@ -22,12 +22,7 @@ const router = Router();
  * GET /notifications
  * Lista as notificações do usuário autenticado.
  */
-router.get(
-  "/",
-  authenticateToken,
-  requireVerifiedEmail,
-  wrap(notificationsController.getUserNotifications),
-);
+router.get("/", authenticateToken, wrap(notificationsController.getUserNotifications));
 
 /**
  * DELETE /notifications
@@ -36,7 +31,6 @@ router.get(
 router.delete(
   "/",
   authenticateToken,
-  requireVerifiedEmail,
   wrap(notificationsController.clearUserNotifications),
 );
 
@@ -44,12 +38,7 @@ router.delete(
  * Retorna a quantidade de notificações não lidas
  * do usuário autenticado.
  */
-router.get(
-  "/unread-count",
-  authenticateToken,
-  requireVerifiedEmail,
-  notificationsController.countUnread,
-);
+router.get("/unread-count", authenticateToken, notificationsController.countUnread);
 
 /**
  * PATCH /notifications/:id/read
@@ -58,7 +47,6 @@ router.get(
 router.patch(
   "/:id/read",
   authenticateToken,
-  requireVerifiedEmail,
   validateNotificationIdParam,
   wrap(notificationsController.markAsRead),
 );
@@ -70,7 +58,6 @@ router.patch(
 router.post(
   "/register-token",
   authenticateToken,
-  requireVerifiedEmail,
   validateRegisterPushToken,
   wrap(notificationsController.registerPushToken),
 );

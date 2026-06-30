@@ -33,6 +33,27 @@ export const authenticateToken = async (req, res, next) => {
   }
 };
 
+export const optionalAuthenticateToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      next();
+      return;
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const decodedToken = await admin.auth().verifyIdToken(token);
+
+    req.userId = decodedToken.uid;
+    req.emailVerified = decodedToken.email_verified === true;
+  } catch (error) {
+    logger.warn({ error: error.message }, "Token opcional inválido ignorado");
+  }
+
+  next();
+};
+
 export const requireVerifiedEmail = (req, res, next) => {
   if (req.emailVerified) {
     next();

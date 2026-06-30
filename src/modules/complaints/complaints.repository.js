@@ -6,6 +6,10 @@ import { ERROR_CODES } from "../../shared/types/error.codes.js";
 import { serialize, timestampToMillis } from "../../shared/utils/firestore.util.js";
 import { distanceBetween, geohashForLocation, geohashQueryBounds } from "geofire-common";
 import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
+import {
+  COMPLAINT_PUBLIC_VISIBILITY,
+  isComplaintPubliclyVisible,
+} from "../../shared/types/complaint.visibility.js";
 import { paginateFirestore } from "../../shared/helpers/paginate.helper.js";
 import { complaintsCursorSchema } from "../../schemas/pagination.schema.js";
 
@@ -56,35 +60,108 @@ const SUMMARY_FIELDS = [
   "createdAt",
   "updatedAt",
 ];
+const ADMIN_SUMMARY_FIELDS = [...SUMMARY_FIELDS, "publicVisibility", "createdById"];
+
+const isFirestoreIndexUnavailableError = (error) =>
+  error?.code === 9 && /requires an index/i.test(error?.message ?? "");
+
+const filterVisiblePage = (page) => ({
+  ...page,
+  items: page.items.filter(isComplaintPubliclyVisible),
+});
 
 export const getPage = async ({ limit, cursor }) => {
   const query = db
     .collection(COLLECTION)
+    .where("publicVisibility", "==", COMPLAINT_PUBLIC_VISIBILITY.VISIBLE)
     .orderBy("createdAt", "desc")
     .orderBy(DOCUMENT_ID_FIELD);
-  return await paginateFirestore({
-    query,
-    cursor,
-    limit,
-    cursorContext: { collection: COLLECTION },
-    cursorSchema: complaintsCursorSchema,
-    getCursorValuesFromDoc: getPageCursorValuesFromDoc,
-    mapDoc: (doc) => serialize(doc.id, doc.data()),
-  });
+
+  try {
+    return await paginateFirestore({
+      query,
+      cursor,
+      limit,
+      cursorContext: { collection: COLLECTION },
+      cursorSchema: complaintsCursorSchema,
+      getCursorValuesFromDoc: getPageCursorValuesFromDoc,
+      mapDoc: (doc) => serialize(doc.id, doc.data()),
+    });
+  } catch (error) {
+    if (!isFirestoreIndexUnavailableError(error)) throw error;
+
+    const fallbackQuery = db
+      .collection(COLLECTION)
+      .orderBy("createdAt", "desc")
+      .orderBy(DOCUMENT_ID_FIELD);
+
+    const page = await paginateFirestore({
+      query: fallbackQuery,
+      cursor,
+      limit,
+      cursorContext: { collection: COLLECTION },
+      cursorSchema: complaintsCursorSchema,
+      getCursorValuesFromDoc: getPageCursorValuesFromDoc,
+      mapDoc: (doc) => serialize(doc.id, doc.data()),
+    });
+
+    return filterVisiblePage(page);
+  }
 };
 
 export const getSummaryPage = async ({ limit, cursor }) => {
   const query = db
     .collection(COLLECTION)
+    .where("publicVisibility", "==", COMPLAINT_PUBLIC_VISIBILITY.VISIBLE)
     .orderBy("createdAt", "desc")
     .orderBy(DOCUMENT_ID_FIELD)
     .select(...SUMMARY_FIELDS);
+
+  try {
+    return await paginateFirestore({
+      query,
+      cursor,
+      limit,
+      cursorContext: { collection: COLLECTION },
+      cursorSchema: complaintsCursorSchema,
+      getCursorValuesFromDoc: getPageCursorValuesFromDoc,
+      mapDoc: (doc) => serialize(doc.id, doc.data()),
+    });
+  } catch (error) {
+    if (!isFirestoreIndexUnavailableError(error)) throw error;
+
+    const fallbackQuery = db
+      .collection(COLLECTION)
+      .orderBy("createdAt", "desc")
+      .orderBy(DOCUMENT_ID_FIELD)
+      .select(...SUMMARY_FIELDS, "publicVisibility");
+
+    const page = await paginateFirestore({
+      query: fallbackQuery,
+      cursor,
+      limit,
+      cursorContext: { collection: COLLECTION },
+      cursorSchema: complaintsCursorSchema,
+      getCursorValuesFromDoc: getPageCursorValuesFromDoc,
+      mapDoc: (doc) => serialize(doc.id, doc.data()),
+    });
+
+    return filterVisiblePage(page);
+  }
+};
+
+export const getAdminSummaryPage = async ({ limit, cursor }) => {
+  const query = db
+    .collection(COLLECTION)
+    .orderBy("createdAt", "desc")
+    .orderBy(DOCUMENT_ID_FIELD)
+    .select(...ADMIN_SUMMARY_FIELDS);
 
   return await paginateFirestore({
     query,
     cursor,
     limit,
-    cursorContext: { collection: COLLECTION },
+    cursorContext: { collection: COLLECTION, scope: "admin" },
     cursorSchema: complaintsCursorSchema,
     getCursorValuesFromDoc: getPageCursorValuesFromDoc,
     mapDoc: (doc) => serialize(doc.id, doc.data()),
@@ -301,17 +378,37 @@ export const findNearestWithinRadius = async (lat, lng, radiusKm) => {
   const center = [Number(lat), Number(lng)];
   const radiusInKm = Number(radiusKm);
   const bounds = geohashQueryBounds(center, radiusInKm * 1000);
-  const snapshots = await Promise.all(
-    bounds.map(([start, end]) =>
-      db.collection(COLLECTION).orderBy("geoHash").startAt(start).endAt(end).get(),
-    ),
-  );
+  let snapshots;
+
+  try {
+    snapshots = await Promise.all(
+      bounds.map(([start, end]) =>
+        db
+          .collection(COLLECTION)
+          .where("publicVisibility", "==", COMPLAINT_PUBLIC_VISIBILITY.VISIBLE)
+          .orderBy("geoHash")
+          .startAt(start)
+          .endAt(end)
+          .get(),
+      ),
+    );
+  } catch (error) {
+    if (!isFirestoreIndexUnavailableError(error)) throw error;
+
+    snapshots = await Promise.all(
+      bounds.map(([start, end]) =>
+        db.collection(COLLECTION).orderBy("geoHash").startAt(start).endAt(end).get(),
+      ),
+    );
+  }
 
   const resultsById = new Map();
 
   for (const doc of snapshots.flatMap((snapshot) => snapshot.docs)) {
     const data = doc.data();
-    if (!data.location || resultsById.has(doc.id)) continue;
+    if (!data.location || resultsById.has(doc.id) || !isComplaintPubliclyVisible(data)) {
+      continue;
+    }
 
     const docCenter = [data.location.latitude, data.location.longitude];
     const distanceInKm = distanceBetween(docCenter, center);
@@ -344,24 +441,45 @@ export const findWithinBounds = async ({ north, south, east, west, limit }) => {
     1,
     Math.ceil((limit * MAP_RANGE_LIMIT_MULTIPLIER) / bounds.length),
   );
-  const snapshots = await Promise.all(
-    bounds.map(([start, end]) =>
-      db
-        .collection(COLLECTION)
-        .orderBy("geoHash")
-        .startAt(start)
-        .endAt(end)
-        .limit(perRangeLimit)
-        .get(),
-    ),
-  );
+  let snapshots;
+
+  try {
+    snapshots = await Promise.all(
+      bounds.map(([start, end]) =>
+        db
+          .collection(COLLECTION)
+          .where("publicVisibility", "==", COMPLAINT_PUBLIC_VISIBILITY.VISIBLE)
+          .orderBy("geoHash")
+          .startAt(start)
+          .endAt(end)
+          .limit(perRangeLimit)
+          .get(),
+      ),
+    );
+  } catch (error) {
+    if (!isFirestoreIndexUnavailableError(error)) throw error;
+
+    snapshots = await Promise.all(
+      bounds.map(([start, end]) =>
+        db
+          .collection(COLLECTION)
+          .orderBy("geoHash")
+          .startAt(start)
+          .endAt(end)
+          .limit(perRangeLimit)
+          .get(),
+      ),
+    );
+  }
   const resultsById = new Map();
 
   for (const doc of snapshots.flatMap((snapshot) => snapshot.docs)) {
     if (resultsById.size >= limit) break;
 
     const data = doc.data();
-    if (!data.location || resultsById.has(doc.id)) continue;
+    if (!data.location || resultsById.has(doc.id) || !isComplaintPubliclyVisible(data)) {
+      continue;
+    }
 
     const latitude = data.location.latitude;
     const longitude = data.location.longitude;

@@ -2,6 +2,8 @@ import { z } from "zod";
 import { VALID_COMPLAINT_TYPES } from "../shared/types/complaint.types.js";
 import { VALID_COMPLAINT_STATUS } from "../shared/types/complaint.status.js";
 import { VALID_COMPLAINT_ANIMALS } from "../shared/types/complaint.animals.js";
+import { VALID_COMPLAINT_MODERATION_STATUS } from "../shared/types/complaint-moderation.status.js";
+import { VALID_COMPLAINT_PUBLIC_VISIBILITY } from "../shared/types/complaint.visibility.js";
 import {
   TILE_INDEX_MAX_ZOOM,
   TILE_INDEX_MIN_ZOOM,
@@ -155,6 +157,65 @@ export const requestValidationSchema = z.object({
   evidenceIds: z.array(z.string()).optional().nullable(),
 });
 
+const moderationReasonSchema = z
+  .string()
+  .trim()
+  .max(500)
+  .transform((value) => (value === "" ? null : value))
+  .nullable()
+  .optional();
+
+export const reportComplaintSchema = z.object({
+  reason: moderationReasonSchema,
+});
+
+export const moderationActionSchema = z.object({
+  reason: moderationReasonSchema,
+});
+
+export const complaintModerationResponseSchema = z.object({
+  id: z.string().optional(),
+  targetType: z.enum(["complaint", "comment"]).default("complaint").optional(),
+  complaintId: z.string(),
+  commentId: z.string().nullable().optional(),
+  moderationStatus: z.enum(VALID_COMPLAINT_MODERATION_STATUS),
+  moderatedBy: z.string().nullable().optional(),
+  moderatedAt: z.any().nullable().optional(),
+  moderationReason: z.string().nullable().optional(),
+  createdAt: z.any().optional(),
+  updatedAt: z.any().optional(),
+  reportCount: z.number().default(0),
+  commentReportCount: z.number().default(0).optional(),
+  latestReportType: z.enum(["complaint", "comment"]).optional(),
+  latestReportReason: z.string().nullable().optional(),
+  latestReportedCommentId: z.string().nullable().optional(),
+  latestReportedCommentText: z.string().nullable().optional(),
+  reportedCommentText: z.string().nullable().optional(),
+  lastReportedAt: z.any().nullable().optional(),
+});
+
+export const complaintModerationPendingItemSchema =
+  complaintModerationResponseSchema.extend({
+    complaint: z
+      .object({
+        id: z.string(),
+        title: z.string(),
+        description: z.string().optional(),
+        type: z.string(),
+        animal: z.string(),
+        location: locationSchema,
+        photos: z.array(z.string()).optional(),
+        thumbnailPhotos: z.array(z.string()).optional(),
+        status: z.enum(VALID_COMPLAINT_STATUS),
+        publicVisibility: z.enum(VALID_COMPLAINT_PUBLIC_VISIBILITY).optional(),
+        createdAt: z.any().optional(),
+        updatedAt: z.any().optional(),
+        createdById: z.string().optional(),
+        createdByUsername: z.string().nullable().optional(),
+      })
+      .nullable(),
+  });
+
 export const complaintResponseSchema = complaintBaseSchema.extend({
   id: z.string(),
   status: z.enum(VALID_COMPLAINT_STATUS),
@@ -180,6 +241,10 @@ export const complaintResponseSchema = complaintBaseSchema.extend({
   proposedEvidenceIds: z.array(z.string()).nullable().optional(),
 });
 
+export const adminComplaintResponseSchema = complaintResponseSchema.extend({
+  publicVisibility: z.enum(VALID_COMPLAINT_PUBLIC_VISIBILITY).optional(),
+});
+
 export const updateStatusSchema = z.object({
   status: z.enum(VALID_COMPLAINT_STATUS),
 });
@@ -190,4 +255,10 @@ export const publicComplaintSummarySchema = complaintBaseSchema.extend({
   followersCount: z.number().default(0),
   createdAt: z.any().optional(),
   updatedAt: z.any().optional(),
+});
+
+export const adminComplaintSummarySchema = publicComplaintSummarySchema.extend({
+  publicVisibility: z.enum(VALID_COMPLAINT_PUBLIC_VISIBILITY).optional(),
+  createdById: z.string().optional(),
+  createdByUsername: z.string().nullable().optional(),
 });
