@@ -2,7 +2,7 @@ import "../src/config/env.js";
 import { db, FieldValue } from "../src/config/firebase.js";
 import { env } from "../src/config/env.js";
 import { COMPLAINT_STATUS } from "../src/shared/types/complaint.status.js";
-import { COMPLAINT_PUBLIC_VISIBILITY } from "../src/shared/types/complaint.visibility.js";
+import { isComplaintPubliclyVisible } from "../src/shared/types/complaint.visibility.js";
 import { getComplaintTiles } from "../src/modules/map-tiles/map-tiles.util.js";
 import {
   COLLECTION as MAP_TILE_STATS_COLLECTION,
@@ -46,7 +46,7 @@ const statsByTileKey = new Map();
 
 for (const doc of snapshot.docs) {
   const complaint = { id: doc.id, ...doc.data() };
-  if (complaint.publicVisibility !== COMPLAINT_PUBLIC_VISIBILITY.VISIBLE) continue;
+  if (!isComplaintPubliclyVisible(complaint)) continue;
 
   const tiles = getComplaintTiles(complaint);
 

@@ -1,6 +1,9 @@
 import * as complaintRepository from "./complaints.repository.js";
 import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
-import { COMPLAINT_PUBLIC_VISIBILITY } from "../../shared/types/complaint.visibility.js";
+import {
+  COMPLAINT_PUBLIC_VISIBILITY,
+  isComplaintPubliclyVisible,
+} from "../../shared/types/complaint.visibility.js";
 import { deleteFiles } from "../../shared/helpers/file.helper.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
@@ -36,8 +39,7 @@ const VALIDATION_REQUEST_ALLOWED_STATUS = [
 const OWNER_RESPONSE_DAYS = 7;
 const OWNER_INACTIVE_REASON_TYPE = "owner_inactive";
 
-const isVisibleComplaint = (complaint) =>
-  complaint.publicVisibility === COMPLAINT_PUBLIC_VISIBILITY.VISIBLE;
+const isVisibleComplaint = isComplaintPubliclyVisible;
 
 const getTileBounds = ({ z, x, y, limit }) => {
   return {

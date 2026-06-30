@@ -8,6 +8,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "backfill:complaint-geohashes": "node scripts/backfill-complaint-geohashes.js",
+    "backfill:complaint-public-visibility": "node scripts/backfill-complaint-public-visibility.js",
     "backfill:map-tile-stats": "node scripts/backfill-map-tile-stats.js",
     "backfill:complaint-thumbnails": "node scripts/backfill-complaint-thumbnails.js",
     "bench": "npm run bench:complaints && npm run bench:map-index",
