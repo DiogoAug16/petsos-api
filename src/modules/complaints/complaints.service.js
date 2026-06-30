@@ -1,5 +1,6 @@
 import * as complaintRepository from "./complaints.repository.js";
 import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
+import { COMPLAINT_PUBLIC_VISIBILITY } from "../../shared/types/complaint.visibility.js";
 import { deleteFiles } from "../../shared/helpers/file.helper.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
@@ -34,6 +35,9 @@ const VALIDATION_REQUEST_ALLOWED_STATUS = [
 ];
 const OWNER_RESPONSE_DAYS = 7;
 const OWNER_INACTIVE_REASON_TYPE = "owner_inactive";
+
+const isVisibleComplaint = (complaint) =>
+  complaint.publicVisibility === COMPLAINT_PUBLIC_VISIBILITY.VISIBLE;
 
 const getTileBounds = ({ z, x, y, limit }) => {
   return {
@@ -83,6 +87,7 @@ export const create = async (complaintData, authenticatedUserId) => {
     ...complaintData,
     createdById: authenticatedUserId,
     status: COMPLAINT_STATUS.OPEN,
+    publicVisibility: COMPLAINT_PUBLIC_VISIBILITY.VISIBLE,
     followersCount: 1,
     volunteersCount: 0,
     createdAt: new Date(),
@@ -125,8 +130,29 @@ export const getAll = async ({ limit, cursor }) => {
   return await complaintRepository.getSummaryPage({ limit, cursor });
 };
 
+export const getAdminAll = async ({ limit, cursor }) => {
+  const complaints = await complaintRepository.getAdminSummaryPage({ limit, cursor });
+  return {
+    ...complaints,
+    items: await usersService.enrichWithCreatedByUsernames(complaints.items),
+  };
+};
+
 export const getDetail = async (id) => {
+  const currentComplaint = await complaintRepository.getDetail(id);
+  if (currentComplaint.publicVisibility !== COMPLAINT_PUBLIC_VISIBILITY.VISIBLE) {
+    throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+  }
+
   const complaint = await openValidationByOwnerInactivityIfNeeded(id);
+  if (complaint.publicVisibility !== COMPLAINT_PUBLIC_VISIBILITY.VISIBLE) {
+    throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+  }
+  return await usersService.enrichWithCreatedByUsername(complaint);
+};
+
+export const getAdminDetail = async (id) => {
+  const complaint = await complaintRepository.getDetail(id);
   return await usersService.enrichWithCreatedByUsername(complaint);
 };
 
@@ -454,7 +480,8 @@ export const getFollowedByUsername = async (username) => {
 
   if (complaintIds.length === 0) return [];
 
-  return await complaintRepository.getByIds(complaintIds);
+  const complaints = await complaintRepository.getByIds(complaintIds);
+  return complaints.filter(isVisibleComplaint);
 };
 
 export const getFollowedSummaryByUsername = async (username) => {
@@ -465,11 +492,14 @@ export const getFollowedSummaryByUsername = async (username) => {
   }
 
   const complaintIds = await complaintFollowersRepository.getComplaintIdsByUserId(userId);
-  const statusSummary = await complaintRepository.getStatusSummaryByIds(complaintIds);
+  const complaints = await complaintRepository.getByIds(complaintIds);
+  const visibleComplaints = complaints.filter(isVisibleComplaint);
 
   return {
-    total: statusSummary.total,
-    resolved: statusSummary.resolved,
+    total: visibleComplaints.length,
+    resolved: visibleComplaints.filter(
+      (complaint) => complaint.status === COMPLAINT_STATUS.RESOLVED,
+    ).length,
   };
 };
 

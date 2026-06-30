@@ -6,6 +6,7 @@ import { ERROR_CODES } from "../../shared/types/error.codes.js";
 import { serialize, timestampToMillis } from "../../shared/utils/firestore.util.js";
 import { distanceBetween, geohashForLocation, geohashQueryBounds } from "geofire-common";
 import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
+import { COMPLAINT_PUBLIC_VISIBILITY } from "../../shared/types/complaint.visibility.js";
 import { paginateFirestore } from "../../shared/helpers/paginate.helper.js";
 import { complaintsCursorSchema } from "../../schemas/pagination.schema.js";
 
@@ -56,10 +57,12 @@ const SUMMARY_FIELDS = [
   "createdAt",
   "updatedAt",
 ];
+const ADMIN_SUMMARY_FIELDS = [...SUMMARY_FIELDS, "publicVisibility", "createdById"];
 
 export const getPage = async ({ limit, cursor }) => {
   const query = db
     .collection(COLLECTION)
+    .where("publicVisibility", "==", COMPLAINT_PUBLIC_VISIBILITY.VISIBLE)
     .orderBy("createdAt", "desc")
     .orderBy(DOCUMENT_ID_FIELD);
   return await paginateFirestore({
@@ -76,6 +79,7 @@ export const getPage = async ({ limit, cursor }) => {
 export const getSummaryPage = async ({ limit, cursor }) => {
   const query = db
     .collection(COLLECTION)
+    .where("publicVisibility", "==", COMPLAINT_PUBLIC_VISIBILITY.VISIBLE)
     .orderBy("createdAt", "desc")
     .orderBy(DOCUMENT_ID_FIELD)
     .select(...SUMMARY_FIELDS);
@@ -85,6 +89,24 @@ export const getSummaryPage = async ({ limit, cursor }) => {
     cursor,
     limit,
     cursorContext: { collection: COLLECTION },
+    cursorSchema: complaintsCursorSchema,
+    getCursorValuesFromDoc: getPageCursorValuesFromDoc,
+    mapDoc: (doc) => serialize(doc.id, doc.data()),
+  });
+};
+
+export const getAdminSummaryPage = async ({ limit, cursor }) => {
+  const query = db
+    .collection(COLLECTION)
+    .orderBy("createdAt", "desc")
+    .orderBy(DOCUMENT_ID_FIELD)
+    .select(...ADMIN_SUMMARY_FIELDS);
+
+  return await paginateFirestore({
+    query,
+    cursor,
+    limit,
+    cursorContext: { collection: COLLECTION, scope: "admin" },
     cursorSchema: complaintsCursorSchema,
     getCursorValuesFromDoc: getPageCursorValuesFromDoc,
     mapDoc: (doc) => serialize(doc.id, doc.data()),
@@ -303,7 +325,13 @@ export const findNearestWithinRadius = async (lat, lng, radiusKm) => {
   const bounds = geohashQueryBounds(center, radiusInKm * 1000);
   const snapshots = await Promise.all(
     bounds.map(([start, end]) =>
-      db.collection(COLLECTION).orderBy("geoHash").startAt(start).endAt(end).get(),
+      db
+        .collection(COLLECTION)
+        .where("publicVisibility", "==", COMPLAINT_PUBLIC_VISIBILITY.VISIBLE)
+        .orderBy("geoHash")
+        .startAt(start)
+        .endAt(end)
+        .get(),
     ),
   );
 
@@ -348,6 +376,7 @@ export const findWithinBounds = async ({ north, south, east, west, limit }) => {
     bounds.map(([start, end]) =>
       db
         .collection(COLLECTION)
+        .where("publicVisibility", "==", COMPLAINT_PUBLIC_VISIBILITY.VISIBLE)
         .orderBy("geoHash")
         .startAt(start)
         .endAt(end)

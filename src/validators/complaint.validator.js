@@ -9,6 +9,8 @@ import {
   mapTilesBatchSchema,
   mapTilesIndexQuerySchema,
   nearestQuerySchema,
+  moderationActionSchema,
+  reportComplaintSchema,
   requestValidationSchema,
 } from "../schemas/complaint.schema.js";
 import { cursorPaginationQuerySchema } from "../schemas/pagination.schema.js";
@@ -141,6 +143,34 @@ export const validateRequestValidation = (req, res, next) => {
     reasonType: result.data.reasonType,
     reasonText: result.data.reasonText ?? null,
     evidenceIds: result.data.evidenceIds ?? null,
+  };
+  next();
+};
+
+export const validateReportComplaint = (req, res, next) => {
+  const result = reportComplaintSchema.safeParse(req.body ?? {});
+
+  if (!result.success) {
+    const errors = z.flattenError(result.error);
+    throw new ValidationError(errors, ERROR_CODES.COMPLAINT_VALIDATION);
+  }
+
+  req.validatedReportData = {
+    reason: result.data.reason ?? null,
+  };
+  next();
+};
+
+export const validateModerationAction = (req, res, next) => {
+  const result = moderationActionSchema.safeParse(req.body ?? {});
+
+  if (!result.success) {
+    const errors = z.flattenError(result.error);
+    throw new ValidationError(errors, ERROR_CODES.COMPLAINT_VALIDATION);
+  }
+
+  req.validatedModerationData = {
+    reason: result.data.reason ?? null,
   };
   next();
 };
