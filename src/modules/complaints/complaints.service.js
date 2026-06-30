@@ -41,6 +41,17 @@ const OWNER_INACTIVE_REASON_TYPE = "owner_inactive";
 
 const isVisibleComplaint = isComplaintPubliclyVisible;
 
+const isVisibleInUserProfile = (complaint, profileUserId, viewerUserId) => {
+  if (!isVisibleComplaint(complaint)) return false;
+
+  const isAnonymousCreatedByProfile =
+    complaint.isAnonymous === true && complaint.createdById === profileUserId;
+
+  if (!isAnonymousCreatedByProfile) return true;
+
+  return viewerUserId === profileUserId;
+};
+
 const getTileBounds = ({ z, x, y, limit }) => {
   return {
     ...getMapTileBounds({ z, x, y }),
@@ -471,7 +482,7 @@ export const requestValidation = async (
   return await usersService.enrichWithCreatedByUsername(updated);
 };
 
-export const getFollowedByUsername = async (username) => {
+export const getFollowedByUsername = async (username, { viewerUserId } = {}) => {
   const userId = await usersService.getUidByUsername(username);
 
   if (!userId) {
@@ -483,10 +494,12 @@ export const getFollowedByUsername = async (username) => {
   if (complaintIds.length === 0) return [];
 
   const complaints = await complaintRepository.getByIds(complaintIds);
-  return complaints.filter(isVisibleComplaint);
+  return complaints.filter((complaint) =>
+    isVisibleInUserProfile(complaint, userId, viewerUserId),
+  );
 };
 
-export const getFollowedSummaryByUsername = async (username) => {
+export const getFollowedSummaryByUsername = async (username, { viewerUserId } = {}) => {
   const userId = await usersService.getUidByUsername(username);
 
   if (!userId) {
@@ -495,7 +508,9 @@ export const getFollowedSummaryByUsername = async (username) => {
 
   const complaintIds = await complaintFollowersRepository.getComplaintIdsByUserId(userId);
   const complaints = await complaintRepository.getByIds(complaintIds);
-  const visibleComplaints = complaints.filter(isVisibleComplaint);
+  const visibleComplaints = complaints.filter((complaint) =>
+    isVisibleInUserProfile(complaint, userId, viewerUserId),
+  );
 
   return {
     total: visibleComplaints.length,

@@ -52,6 +52,28 @@ export const reportComplaint = async ({ complaintId, reporterId, reason }) => {
   return moderation;
 };
 
+export const reportComment = async ({ complaintId, commentId, reporterId, reason }) => {
+  const moderation = await complaintModerationsRepository.reportComment({
+    complaintId,
+    commentId,
+    reporterId,
+    reason,
+  });
+
+  logger.info(
+    {
+      event: "comments.reported",
+      complaintId,
+      commentId,
+      actorUserId: reporterId,
+      reportCount: moderation.reportCount,
+    },
+    "Comentário reportado para moderação",
+  );
+
+  return moderation;
+};
+
 export const getPending = async ({ limit, cursor }) => {
   const page = await complaintModerationsRepository.getPendingPage({ limit, cursor });
   const complaintIds = page.items.map((item) => item.complaintId).filter(Boolean);
@@ -70,29 +92,34 @@ export const getPending = async ({ limit, cursor }) => {
   };
 };
 
-export const applyAction = async ({ complaintId, adminId, action, reason }) => {
+export const applyAction = async ({ moderationId, adminId, action, reason }) => {
   const result = await complaintModerationsRepository.applyModerationAction({
-    complaintId,
+    moderationId,
     adminId,
     action,
     reason,
   });
 
-  await syncModerationVisibilityTiles({
-    previousComplaint: result.previousComplaint,
-    nextComplaint: result.complaint,
-    complaintId,
-    action: `moderation_${action}`,
-  });
+  if (result.complaint || result.previousComplaint) {
+    await syncModerationVisibilityTiles({
+      previousComplaint: result.previousComplaint,
+      nextComplaint: result.complaint,
+      complaintId: result.moderation.complaintId,
+      action: `moderation_${action}`,
+    });
+  }
 
   logger.info(
     {
       event: "complaints.moderation.applied",
-      complaintId,
+      moderationId,
+      complaintId: result.moderation.complaintId,
+      commentId: result.moderation.commentId ?? null,
+      targetType: result.moderation.targetType ?? "complaint",
       actorUserId: adminId,
       action,
       moderationStatus: result.moderation.moderationStatus,
-      publicVisibility: result.complaint.publicVisibility,
+      publicVisibility: result.complaint?.publicVisibility ?? null,
     },
     "Ação administrativa de moderação aplicada",
   );

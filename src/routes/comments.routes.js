@@ -10,8 +10,14 @@ import {
   requireVerifiedEmail,
 } from "../shared/middlewares/auth.middleware.js";
 import { wrap } from "../shared/utils/async-handler.util.js";
+import { rateLimit } from "../shared/middlewares/rate-limit.middleware.js";
 
 const router = Router({ mergeParams: true });
+const commentReportRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  keyPrefix: "comment_reports",
+});
 
 router.post(
   "/",
@@ -35,6 +41,15 @@ router.post(
   requireVerifiedEmail,
   commentLikesValidator.validateCommentLike,
   wrap(commentLikesController.like),
+);
+
+router.post(
+  "/:commentId/report",
+  authenticateToken,
+  requireVerifiedEmail,
+  commentReportRateLimit,
+  commentsValidator.validateReportComment,
+  wrap(commentsController.report),
 );
 
 router.delete(

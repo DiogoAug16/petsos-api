@@ -98,14 +98,19 @@ export const unfollow = async (complaintId, userId) => {
 };
 
 export const getFollowers = async (complaintId) => {
-  await getComplaintSnapshotOrFail(complaintId);
+  const complaintDoc = await getComplaintSnapshotOrFail(complaintId);
+  const complaint = complaintDoc.data();
 
   const snapshot = await db
     .collection(COLLECTION)
     .where("complaintId", "==", complaintId)
     .get();
 
-  return snapshot.docs.map((doc) => doc.data().userId);
+  const followerIds = snapshot.docs.map((doc) => doc.data().userId);
+
+  if (!complaint.isAnonymous) return followerIds;
+
+  return followerIds.filter((userId) => userId !== complaint.createdById);
 };
 
 export const isFollowing = async (complaintId, userId) => {
@@ -116,7 +121,19 @@ export const isFollowing = async (complaintId, userId) => {
 
 export const countByComplaintId = async (complaintId) => {
   const complaintDoc = await getComplaintSnapshotOrFail(complaintId);
-  return complaintDoc.data().followersCount ?? 0;
+  const complaint = complaintDoc.data();
+  const followersCount = complaint.followersCount ?? 0;
+
+  if (!complaint.isAnonymous || !complaint.createdById) return followersCount;
+
+  const creatorFollowerDoc = await getFollowerDocRef(
+    complaintId,
+    complaint.createdById,
+  ).get();
+
+  if (!creatorFollowerDoc.exists) return followersCount;
+
+  return Math.max(followersCount - 1, 0);
 };
 
 export const getComplaintIdsByUserId = async (userId) => {

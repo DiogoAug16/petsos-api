@@ -174,7 +174,10 @@ export const moderationActionSchema = z.object({
 });
 
 export const complaintModerationResponseSchema = z.object({
+  id: z.string().optional(),
+  targetType: z.enum(["complaint", "comment"]).default("complaint").optional(),
   complaintId: z.string(),
+  commentId: z.string().nullable().optional(),
   moderationStatus: z.enum(VALID_COMPLAINT_MODERATION_STATUS),
   moderatedBy: z.string().nullable().optional(),
   moderatedAt: z.any().nullable().optional(),
@@ -182,6 +185,12 @@ export const complaintModerationResponseSchema = z.object({
   createdAt: z.any().optional(),
   updatedAt: z.any().optional(),
   reportCount: z.number().default(0),
+  commentReportCount: z.number().default(0).optional(),
+  latestReportType: z.enum(["complaint", "comment"]).optional(),
+  latestReportReason: z.string().nullable().optional(),
+  latestReportedCommentId: z.string().nullable().optional(),
+  latestReportedCommentText: z.string().nullable().optional(),
+  reportedCommentText: z.string().nullable().optional(),
   lastReportedAt: z.any().nullable().optional(),
 });
 

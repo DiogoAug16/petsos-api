@@ -23,10 +23,10 @@ export const getMe = async (req, res) => {
 export const getMeSummary = async (req, res) => {
   const profile = await usersService.getPublicProfileById(req.userId);
   const [followedSummary, unreadNotifications] = await Promise.all([
-    complaintService.getFollowedSummaryByUsername(profile.username),
-    req.emailVerified
-      ? notificationsService.countUnread(req.userId)
-      : Promise.resolve({ count: 0 }),
+    complaintService.getFollowedSummaryByUsername(profile.username, {
+      viewerUserId: req.userId,
+    }),
+    notificationsService.countUnread(req.userId),
   ]);
 
   const responseData = currentUserSummarySchema.parse({
@@ -54,6 +54,7 @@ export const getPublicProfileSummary = async (req, res) => {
   );
   const followedSummary = await complaintService.getFollowedSummaryByUsername(
     profile.username,
+    { viewerUserId: req.userId },
   );
 
   const responseData = publicUserProfileSummarySchema.parse({
@@ -85,6 +86,7 @@ export const updateMe = async (req, res) => {
 export const getFollowedComplaints = async (req, res) => {
   const complaints = await complaintService.getFollowedByUsername(
     req.validatedParams.username,
+    { viewerUserId: req.userId },
   );
   const responseData = z.array(publicComplaintSummarySchema).parse(complaints);
   return success(res, responseData, StatusCodes.OK);
@@ -94,6 +96,7 @@ export const getFollowedComplaints = async (req, res) => {
 export const getFollowedComplaintsSummary = async (req, res) => {
   const responseData = await complaintService.getFollowedSummaryByUsername(
     req.validatedParams.username,
+    { viewerUserId: req.userId },
   );
   return success(res, responseData, StatusCodes.OK);
 };

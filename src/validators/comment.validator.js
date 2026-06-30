@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { createCommentSchema, getCommentsSchema } from "../schemas/comment.schema.js";
+import {
+  createCommentSchema,
+  getCommentsSchema,
+  reportCommentSchema,
+} from "../schemas/comment.schema.js";
 import { ValidationError } from "../shared/errors/validation.error.js";
 import { ERROR_CODES } from "../shared/types/error.codes.js";
 
@@ -36,6 +40,26 @@ export const validateGetComments = (req, res, next) => {
   req.validatedCommentsQuery = {
     complaintId: result.data.params.id,
     ...result.data.query,
+  };
+
+  next();
+};
+
+export const validateReportComment = (req, res, next) => {
+  const result = reportCommentSchema.safeParse({
+    params: req.params,
+    body: req.body ?? {},
+  });
+
+  if (!result.success) {
+    const errors = z.flattenError(result.error);
+    throw new ValidationError(errors, ERROR_CODES.COMMENT_VALIDATION);
+  }
+
+  req.validatedCommentReportData = {
+    complaintId: result.data.params.id,
+    commentId: result.data.params.commentId,
+    reason: result.data.body.reason ?? null,
   };
 
   next();

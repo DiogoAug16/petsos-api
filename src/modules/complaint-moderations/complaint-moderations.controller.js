@@ -29,7 +29,7 @@ export const getPending = async (req, res) => {
 
 const applyModerationAction = async (req, res, action) => {
   const moderation = await complaintModerationsService.applyAction({
-    complaintId: req.params.id,
+    moderationId: req.params.id,
     adminId: req.userId,
     action,
     reason: req.validatedModerationData.reason,
