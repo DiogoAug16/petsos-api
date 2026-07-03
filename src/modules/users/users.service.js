@@ -1,11 +1,22 @@
 import * as usersRepository from "./users.repository.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
+import { deleteFiles } from "../../shared/helpers/file.helper.js";
+import { getUserRole } from "../../shared/utils/user-role.js";
+import logger from "../../logger/index.js";
 
 const toPublicProfile = (profile) => ({
   name: profile.name ?? null,
   username: profile.username,
+  description: profile.description ?? null,
+  locationLabel: profile.locationLabel ?? null,
+  photoUrl: profile.photoUrl ?? null,
   createdAt: profile.createdAt,
+  updatedAt: profile.updatedAt,
 });
+
+const isLocalUploadPath = (path) => {
+  return typeof path === "string" && path.startsWith("/uploads/");
+};
 
 export const getUidByUsername = async (username) => {
   return await usersRepository.getUidByUsername(username);
@@ -29,6 +40,54 @@ export const getPublicProfileById = async (userId) => {
   }
 
   return toPublicProfile(profile);
+};
+
+export const getRoleById = async (userId) => {
+  const profile = await usersRepository.getUserById(userId);
+  return getUserRole(profile);
+};
+
+export const updateCurrentProfile = async (
+  userId,
+  { name, description, locationLabel, photoUrl },
+) => {
+  const currentProfile = await usersRepository.getUserById(userId);
+
+  if (!currentProfile) {
+    throw new NotFoundError();
+  }
+
+  const updateData = {
+    name,
+    description: description || null,
+    locationLabel: locationLabel || null,
+  };
+
+  if (photoUrl) {
+    updateData.photoUrl = photoUrl;
+  }
+
+  const updatedProfile = await usersRepository.updateProfile(userId, updateData);
+
+  if (
+    photoUrl &&
+    currentProfile.photoUrl !== photoUrl &&
+    isLocalUploadPath(currentProfile.photoUrl)
+  ) {
+    await deleteFiles([currentProfile.photoUrl]);
+  }
+
+  logger.info(
+    {
+      event: "users.profile.updated",
+      userId,
+      changedFields: Object.keys(updateData),
+      photoChanged: Boolean(photoUrl),
+    },
+    "Perfil do usuário atualizado",
+  );
+
+  return toPublicProfile(updatedProfile);
 };
 
 export const getUsernamesByIds = async (uids) => {
@@ -55,12 +114,15 @@ export const enrichWithUsername = async (item) => {
 export const enrichWithCreatedByUsernames = async (items) => {
   if (items.length === 0) return [];
 
-  const userIds = items.map((item) => item.createdById).filter(Boolean);
+  const visibleItems = items.filter((item) => !item.isAnonymous);
+  const userIds = visibleItems.map((item) => item.createdById).filter(Boolean);
   const usersById = await getUsernamesByIds(userIds);
 
   return items.map((item) => ({
     ...item,
-    createdByUsername: usersById.get(item.createdById) ?? null,
+    createdByUsername: item.isAnonymous
+      ? null
+      : (usersById.get(item.createdById) ?? null),
   }));
 };
 

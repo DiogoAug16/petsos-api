@@ -1,6 +1,7 @@
 import admin from "firebase-admin";
 import { StatusCodes } from "http-status-codes";
 import logger from "../../logger/index.js";
+import { ERROR_CODES } from "../types/error.codes.js";
 
 export const authenticateToken = async (req, res, next) => {
   try {
@@ -18,6 +19,7 @@ export const authenticateToken = async (req, res, next) => {
 
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.userId = decodedToken.uid;
+    req.emailVerified = decodedToken.email_verified === true;
 
     next();
   } catch (error) {
@@ -29,4 +31,38 @@ export const authenticateToken = async (req, res, next) => {
       errorCode: "UNAUTHORIZED",
     });
   }
+};
+
+export const optionalAuthenticateToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      next();
+      return;
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const decodedToken = await admin.auth().verifyIdToken(token);
+
+    req.userId = decodedToken.uid;
+    req.emailVerified = decodedToken.email_verified === true;
+  } catch (error) {
+    logger.warn({ error: error.message }, "Token opcional inválido ignorado");
+  }
+
+  next();
+};
+
+export const requireVerifiedEmail = (req, res, next) => {
+  if (req.emailVerified) {
+    next();
+    return;
+  }
+
+  return res.status(StatusCodes.FORBIDDEN).json({
+    success: false,
+    message: "Confirme seu email para continuar.",
+    errorCode: ERROR_CODES.EMAIL_NOT_VERIFIED,
+  });
 };

@@ -4,6 +4,9 @@ import * as complaintFollowersRepository from "../complaint-followers/complaint-
 import * as complaintVolunteersRepository from "../complaint-volunteers/complaint-volunteers.repository.js";
 import * as complaintEvidenceRepository from "../complaint-evidence/complaint-evidence.repository.js";
 import * as notificationsService from "../notifications/notifications.service.js";
+import * as mapTilesService from "../map-tiles/map-tiles.service.js";
+import { publishMapTileInvalidation } from "../map-tiles/map-tiles.realtime.js";
+import { getComplaintTileKeys } from "../map-tiles/map-tiles.util.js";
 import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { ValidationError } from "../../shared/errors/validation.error.js";
@@ -34,6 +37,24 @@ const isVotingEnabled = (complaint) => {
     complaint.status === COMPLAINT_STATUS.AWAITING_VALIDATION &&
     (Boolean(complaint.validationRequestedAt) || isOwnerInactive(complaint))
   );
+};
+
+const syncAndPublishComplaintStatusTile = async ({
+  previousComplaint,
+  nextComplaint,
+  complaintId,
+  action,
+}) => {
+  await mapTilesService.syncComplaintTileStats({
+    previousComplaint,
+    nextComplaint,
+  });
+
+  publishMapTileInvalidation({
+    tileKeys: getComplaintTileKeys(nextComplaint || previousComplaint),
+    complaintId,
+    action,
+  });
 };
 
 const getEligibleVoters = async (complaintId, authorId) => {
@@ -71,6 +92,127 @@ const getVotingProgress = (counts, totalEligible) => {
   };
 };
 
+const getCommunityVoteDecision = ({ complaint, counts, totalEligible }) => {
+  if (!isVotingEnabled(complaint)) {
+    throw new ValidationError(
+      `Votação só é permitida após abertura por voluntário ou ${OWNER_RESPONSE_DAYS} dias sem resposta do criador`,
+      ERROR_CODES.COMPLAINT_INVALID_STATUS_TRANSITION,
+    );
+  }
+
+  const votingProgress = getVotingProgress(counts, totalEligible);
+  const isEvidenceSelection =
+    complaint.validationRequestReasonType === "evidence_selection";
+  const isClosingReason = ["already_resolved", "false_report"].includes(
+    complaint.validationRequestReasonType,
+  );
+
+  if (votingProgress.canResolve) {
+    const targetStatus = isClosingReason
+      ? COMPLAINT_STATUS.CLOSED
+      : COMPLAINT_STATUS.RESOLVED;
+    const decisionId = `${complaint.id}:community:${targetStatus}`;
+    const metadata = isClosingReason
+      ? {
+          closedBy: "community",
+          closedAt: new Date(),
+          validationCount: counts.approved,
+          communityDecisionId: decisionId,
+          validationFinalizedAt: new Date(),
+        }
+      : {
+          resolvedBy: isEvidenceSelection ? "community_evidence_vote" : "community",
+          resolvedAt: new Date(),
+          validationCount: counts.approved,
+          selectedEvidenceIds: isEvidenceSelection ? complaint.proposedEvidenceIds : null,
+          communityDecisionId: decisionId,
+          validationFinalizedAt: new Date(),
+        };
+
+    return {
+      outcome: isClosingReason ? "closed" : "resolved",
+      status: targetStatus,
+      metadata,
+      evidenceUpdates:
+        isEvidenceSelection && complaint.proposedEvidenceIds?.length > 0
+          ? complaint.proposedEvidenceIds.map((id) => ({
+              ref: complaintEvidenceRepository.getDocRef(id),
+              data: { status: "approved" },
+            }))
+          : [],
+      notificationType: isClosingReason
+        ? "complaint_closed_community"
+        : "complaint_resolved_community",
+      authorMessage: isClosingReason
+        ? `Sua denúncia "${complaint.title}" foi fechada pela comunidade com ${counts.approved} voto(s).`
+        : `Sua denúncia "${complaint.title}" foi confirmada pela comunidade com ${counts.approved} validação(ões).`,
+      followersMessage: isClosingReason
+        ? `A denúncia "${complaint.title}" foi fechada por votação da comunidade (${counts.approved} votos).`
+        : `A denúncia "${complaint.title}" foi resolvida por votação da comunidade (${counts.approved} validações).`,
+      responseMessage: isClosingReason
+        ? "Voto registrado. Denúncia fechada por votação da comunidade."
+        : "Voto registrado. Denúncia resolvida por votação da comunidade.",
+      reason: isEvidenceSelection
+        ? "community_evidence_approval"
+        : "community_quorum_approval",
+      votingProgress,
+    };
+  }
+
+  if (votingProgress.canReject) {
+    if (isEvidenceSelection) {
+      return {
+        outcome: "evidenceSelectionRejected",
+        status: COMPLAINT_STATUS.AWAITING_VALIDATION,
+        clearVotes: true,
+        metadata: {
+          proposedEvidenceIds: null,
+          validationRequestedAt: null,
+          validationRequestedBy: null,
+          validationRequestReasonType: null,
+          validationRequestReasonText: null,
+        },
+        notificationType: "status_change",
+        followersMessage: `A proposta de evidências para "${complaint.title}" foi rejeitada pela comunidade. Uma nova votação pode ser aberta.`,
+        responseMessage:
+          "Proposta de evidências rejeitada. A denúncia continua aguardando validação.",
+        reason: "community_evidence_rejection",
+        votingProgress,
+      };
+    }
+
+    const rejectedAt = new Date();
+    const rejectionExpiresAt = new Date(rejectedAt.getTime() + 48 * 60 * 60 * 1000);
+
+    return {
+      outcome: "rejected",
+      status: complaint.status,
+      clearVotes: true,
+      metadata: {
+        rejectedBy: "community",
+        rejectedAt,
+        rejectionCount: counts.rejected,
+        rejectionExpiresAt,
+        validationRequestedAt: null,
+        validationRequestedBy: null,
+        validationRequestReasonType: null,
+        validationRequestReasonText: null,
+      },
+      notificationType: "complaint_rejected_community",
+      authorMessage: `Sua denúncia "${complaint.title}" foi rejeitada pela comunidade com ${counts.rejected} voto(s) contra.`,
+      followersMessage: `A denúncia "${complaint.title}" foi rejeitada por votação da comunidade (${counts.rejected} votos contra).`,
+      responseMessage: "Voto registrado. Denúncia rejeitada por votação da comunidade.",
+      reason: "community_quorum_rejection",
+      votingProgress,
+    };
+  }
+
+  return {
+    outcome: "pending",
+    votingProgress,
+  };
+};
+
 export const vote = async ({ complaintId, userId, approved }) => {
   const complaint = await complaintRepository.getDetail(complaintId);
 
@@ -97,161 +239,76 @@ export const vote = async ({ complaintId, userId, approved }) => {
     throw new ForbiddenError("Apenas seguidores ou voluntários podem votar");
   }
 
-  await complaintVotesRepository.vote(complaintId, userId, approved);
-
   const eligibleVoters = await getEligibleVoters(complaintId, complaint.createdById);
   const totalEligible = eligibleVoters.size;
+  const { counts, decision } =
+    await complaintVotesRepository.voteAndApplyCommunityDecision({
+      complaintId,
+      userId,
+      approved,
+      resolveDecision: ({ complaint: latestComplaint, counts: latestCounts }) =>
+        getCommunityVoteDecision({
+          complaint: latestComplaint,
+          counts: latestCounts,
+          totalEligible,
+        }),
+    });
 
-  const counts = await complaintVotesRepository.countByComplaintId(complaintId);
-  const votingProgress = getVotingProgress(counts, totalEligible);
-
-  const isEvidenceSelection =
-    complaint.validationRequestReasonType === "evidence_selection";
-  const isClosingReason = ["already_resolved", "false_report"].includes(
-    complaint.validationRequestReasonType,
-  );
-
-  if (votingProgress.canResolve) {
-    if (isEvidenceSelection && complaint.proposedEvidenceIds?.length > 0) {
-      await complaintEvidenceRepository.updateStatusByIds(
-        complaint.proposedEvidenceIds,
-        "approved",
-      );
+  if (["resolved", "closed", "rejected"].includes(decision.outcome)) {
+    if (decision.status) {
+      await syncAndPublishComplaintStatusTile({
+        previousComplaint: complaint,
+        nextComplaint: { ...complaint, status: decision.status },
+        complaintId,
+        action: `community_${decision.outcome}`,
+      });
     }
-
-    const targetStatus = isClosingReason
-      ? COMPLAINT_STATUS.CLOSED
-      : COMPLAINT_STATUS.RESOLVED;
-
-    const metadata = isClosingReason
-      ? {
-          closedBy: "community",
-          closedAt: new Date(),
-          validationCount: counts.approved,
-        }
-      : {
-          resolvedBy: isEvidenceSelection ? "community_evidence_vote" : "community",
-          resolvedAt: new Date(),
-          validationCount: counts.approved,
-          selectedEvidenceIds: isEvidenceSelection ? complaint.proposedEvidenceIds : null,
-        };
-
-    await complaintRepository.setStatusWithMetadata(complaintId, targetStatus, metadata);
-
-    const notificationType = isClosingReason
-      ? "complaint_closed_community"
-      : "complaint_resolved_community";
-    const authorMessage = isClosingReason
-      ? `Sua denúncia "${complaint.title}" foi fechada pela comunidade com ${counts.approved} voto(s).`
-      : `Sua denúncia "${complaint.title}" foi confirmada pela comunidade com ${counts.approved} validação(ões).`;
-    const followersMessage = isClosingReason
-      ? `A denúncia "${complaint.title}" foi fechada por votação da comunidade (${counts.approved} votos).`
-      : `A denúncia "${complaint.title}" foi resolvida por votação da comunidade (${counts.approved} validações).`;
 
     await notificationsService.createNotification({
       userId: complaint.createdById,
       complaintId,
-      type: notificationType,
-      message: authorMessage,
+      type: decision.notificationType,
+      message: decision.authorMessage,
       sendPush: true,
     });
 
     await notificationsService.notifyComplaintFollowers({
       complaintId,
       actorUserId: complaint.createdById,
-      type: notificationType,
-      message: followersMessage,
+      type: decision.notificationType,
+      message: decision.followersMessage,
       sendPush: false,
     });
 
     return {
-      message: isClosingReason
-        ? "Voto registrado. Denúncia fechada por votação da comunidade."
-        : "Voto registrado. Denúncia resolvida por votação da comunidade.",
-      resolved: !isClosingReason,
-      closed: isClosingReason,
+      message: decision.responseMessage,
+      resolved: decision.outcome === "resolved",
+      closed: decision.outcome === "closed",
+      rejected: decision.outcome === "rejected",
       votes: counts,
       totalEligible,
-      reason: isEvidenceSelection
-        ? "community_evidence_approval"
-        : "community_quorum_approval",
-      ...votingProgress,
+      reason: decision.reason,
+      ...decision.votingProgress,
     };
   }
 
-  if (votingProgress.canReject) {
-    if (isEvidenceSelection) {
-      await complaintVotesRepository.clearVotesByComplaintId(complaintId);
-      await complaintRepository.setStatusWithMetadata(
-        complaintId,
-        COMPLAINT_STATUS.AWAITING_VALIDATION,
-        {
-          proposedEvidenceIds: null,
-          validationRequestedAt: null,
-          validationRequestedBy: null,
-          validationRequestReasonType: null,
-          validationRequestReasonText: null,
-        },
-      );
-
-      await notificationsService.notifyComplaintFollowers({
-        complaintId,
-        actorUserId: userId,
-        type: "status_change",
-        message: `A proposta de evidências para "${complaint.title}" foi rejeitada pela comunidade. Uma nova votação pode ser aberta.`,
-        sendPush: false,
-      });
-
-      return {
-        message:
-          "Proposta de evidências rejeitada. A denúncia continua aguardando validação.",
-        rejected: true,
-        evidenceSelectionRejected: true,
-        votes: counts,
-        totalEligible,
-        reason: "community_evidence_rejection",
-        ...votingProgress,
-      };
-    }
-
-    const rejectedAt = new Date();
-    const rejectionExpiresAt = new Date(rejectedAt.getTime() + 48 * 60 * 60 * 1000);
-
-    await complaintVotesRepository.clearVotesByComplaintId(complaintId);
-    await complaintRepository.setStatusWithMetadata(complaintId, complaint.status, {
-      rejectedBy: "community",
-      rejectedAt,
-      rejectionCount: counts.rejected,
-      rejectionExpiresAt,
-      validationRequestedAt: null,
-      validationRequestedBy: null,
-      validationRequestReasonType: null,
-      validationRequestReasonText: null,
-    });
-
-    await notificationsService.createNotification({
-      userId: complaint.createdById,
-      complaintId,
-      type: "complaint_rejected_community",
-      message: `Sua denúncia "${complaint.title}" foi rejeitada pela comunidade com ${counts.rejected} voto(s) contra.`,
-      sendPush: true,
-    });
-
+  if (decision.outcome === "evidenceSelectionRejected") {
     await notificationsService.notifyComplaintFollowers({
       complaintId,
-      actorUserId: complaint.createdById,
-      type: "complaint_rejected_community",
-      message: `A denúncia "${complaint.title}" foi rejeitada por votação da comunidade (${counts.rejected} votos contra).`,
+      actorUserId: userId,
+      type: decision.notificationType,
+      message: decision.followersMessage,
       sendPush: false,
     });
 
     return {
-      message: "Voto registrado. Denúncia rejeitada por votação da comunidade.",
+      message: decision.responseMessage,
       rejected: true,
+      evidenceSelectionRejected: true,
       votes: counts,
       totalEligible,
-      reason: "community_quorum_rejection",
-      ...votingProgress,
+      reason: decision.reason,
+      ...decision.votingProgress,
     };
   }
 
@@ -261,7 +318,7 @@ export const vote = async ({ complaintId, userId, approved }) => {
     rejected: false,
     votes: counts,
     totalEligible,
-    ...votingProgress,
+    ...decision.votingProgress,
   };
 };
 
@@ -316,7 +373,8 @@ export const voteEvidenceSelection = async ({ complaintId, userId, evidenceIds }
     if (topEvidenceIds.length > 0) {
       await complaintEvidenceRepository.updateStatusByIds(topEvidenceIds, "approved");
 
-      await complaintRepository.setStatusWithMetadata(
+      const decisionId = `${complaintId}:community:${COMPLAINT_STATUS.RESOLVED}:evidence-selection`;
+      const finalization = await complaintRepository.setStatusWithMetadataOnce(
         complaintId,
         COMPLAINT_STATUS.RESOLVED,
         {
@@ -324,24 +382,36 @@ export const voteEvidenceSelection = async ({ complaintId, userId, evidenceIds }
           resolvedAt: new Date(),
           selectedEvidenceIds: topEvidenceIds,
           validationCount: selectionCounts.totalVoters,
+          communityDecisionId: decisionId,
+          validationFinalizedAt: new Date(),
         },
+        decisionId,
       );
 
-      await notificationsService.createNotification({
-        userId: complaint.createdById,
-        complaintId,
-        type: "complaint_resolved_community",
-        message: `Sua denúncia "${complaint.title}" foi confirmada pela comunidade com ${selectionCounts.totalVoters} validação(ões). Evidências selecionadas pela votação.`,
-        sendPush: true,
-      });
+      if (finalization.applied) {
+        await syncAndPublishComplaintStatusTile({
+          previousComplaint: complaint,
+          nextComplaint: finalization.complaint,
+          complaintId,
+          action: "community_evidence_resolved",
+        });
 
-      await notificationsService.notifyComplaintFollowers({
-        complaintId,
-        actorUserId: complaint.createdById,
-        type: "complaint_resolved_community",
-        message: `A denúncia "${complaint.title}" foi resolvida por seleção de evidências da comunidade (${selectionCounts.totalVoters} votos).`,
-        sendPush: false,
-      });
+        await notificationsService.createNotification({
+          userId: complaint.createdById,
+          complaintId,
+          type: "complaint_resolved_community",
+          message: `Sua denúncia "${complaint.title}" foi confirmada pela comunidade com ${selectionCounts.totalVoters} validação(ões). Evidências selecionadas pela votação.`,
+          sendPush: true,
+        });
+
+        await notificationsService.notifyComplaintFollowers({
+          complaintId,
+          actorUserId: complaint.createdById,
+          type: "complaint_resolved_community",
+          message: `A denúncia "${complaint.title}" foi resolvida por seleção de evidências da comunidade (${selectionCounts.totalVoters} votos).`,
+          sendPush: false,
+        });
+      }
 
       return {
         message:

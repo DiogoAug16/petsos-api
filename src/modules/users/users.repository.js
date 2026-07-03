@@ -20,7 +20,7 @@ export async function getUsernameByUid(uid) {
 export async function getUserById(uid) {
   const doc = await db.collection(USERS_COLLECTION).doc(uid).get();
 
-  return doc.exists ? doc.data() : null;
+  return doc.exists ? { id: doc.id, ...doc.data() } : null;
 }
 
 export async function getUserByUsername(username) {
@@ -68,6 +68,19 @@ export async function updatePushToken(userId, pushToken) {
     },
     { merge: true },
   );
+}
+
+export async function updateProfile(userId, data) {
+  const docRef = db.collection(USERS_COLLECTION).doc(userId);
+  const updateData = {
+    ...data,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await docRef.update(updateData);
+
+  const updatedDoc = await docRef.get();
+  return updatedDoc.exists ? { id: updatedDoc.id, ...updatedDoc.data() } : null;
 }
 
 /**

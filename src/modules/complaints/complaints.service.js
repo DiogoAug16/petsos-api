@@ -1,5 +1,10 @@
 import * as complaintRepository from "./complaints.repository.js";
 import { COMPLAINT_STATUS } from "../../shared/types/complaint.status.js";
+import {
+  COMPLAINT_PUBLIC_VISIBILITY,
+  isComplaintPubliclyVisible,
+} from "../../shared/types/complaint.visibility.js";
+import { USER_ROLES } from "../../shared/constants/user-roles.js";
 import { deleteFiles } from "../../shared/helpers/file.helper.js";
 import { ForbiddenError } from "../../shared/errors/forbidden.error.js";
 import { NotFoundError } from "../../shared/errors/not-found.error.js";
@@ -11,6 +16,14 @@ import * as usersService from "../users/users.service.js";
 import * as notificationsService from "../notifications/notifications.service.js";
 import * as complaintValidationsRepository from "../complaint-validations/complaint-validations.repository.js";
 import * as complaintVolunteersRepository from "../complaint-volunteers/complaint-volunteers.repository.js";
+import * as mapTilesService from "../map-tiles/map-tiles.service.js";
+import { publishMapTileInvalidation } from "../map-tiles/map-tiles.realtime.js";
+import {
+  getChangedComplaintTileKeys,
+  getComplaintTileKeys,
+  getMapTileBounds,
+} from "../map-tiles/map-tiles.util.js";
+import logger from "../../logger/index.js";
 
 const VALID_TRANSITIONS = {
   [COMPLAINT_STATUS.OPEN]: [COMPLAINT_STATUS.IN_PROGRESS],
@@ -27,6 +40,60 @@ const VALIDATION_REQUEST_ALLOWED_STATUS = [
 const OWNER_RESPONSE_DAYS = 7;
 const OWNER_INACTIVE_REASON_TYPE = "owner_inactive";
 
+const isVisibleComplaint = isComplaintPubliclyVisible;
+
+const isVisibleInUserProfile = (complaint, profileUserId, viewerUserId) => {
+  if (!isVisibleComplaint(complaint)) return false;
+
+  const isAnonymousCreatedByProfile =
+    complaint.isAnonymous === true && complaint.createdById === profileUserId;
+
+  if (!isAnonymousCreatedByProfile) return true;
+
+  return viewerUserId === profileUserId;
+};
+
+const getTileBounds = ({ z, x, y, limit }) => {
+  return {
+    ...getMapTileBounds({ z, x, y }),
+    limit,
+  };
+};
+
+const syncAndPublishMapTiles = async ({
+  previousComplaint,
+  nextComplaint,
+  complaintId,
+  action,
+}) => {
+  await mapTilesService.syncComplaintTileStats({
+    previousComplaint,
+    nextComplaint,
+  });
+
+  const tileKeys =
+    previousComplaint && nextComplaint
+      ? getChangedComplaintTileKeys(previousComplaint, nextComplaint)
+      : getComplaintTileKeys(nextComplaint || previousComplaint);
+
+  publishMapTileInvalidation({
+    tileKeys,
+    complaintId,
+    action,
+  });
+
+  logger.info(
+    {
+      event: "complaints.map_tiles.synced",
+      complaintId,
+      action,
+      tileCount: tileKeys.length,
+      status: nextComplaint?.status ?? previousComplaint?.status ?? null,
+    },
+    "Tiles do mapa sincronizados para denúncia",
+  );
+};
+
 export const create = async (complaintData, authenticatedUserId) => {
   const complaintId = complaintRepository.createId();
 
@@ -34,6 +101,7 @@ export const create = async (complaintData, authenticatedUserId) => {
     ...complaintData,
     createdById: authenticatedUserId,
     status: COMPLAINT_STATUS.OPEN,
+    publicVisibility: COMPLAINT_PUBLIC_VISIBILITY.VISIBLE,
     followersCount: 1,
     volunteersCount: 0,
     createdAt: new Date(),
@@ -49,19 +117,56 @@ export const create = async (complaintData, authenticatedUserId) => {
     ),
   ]);
 
+  await syncAndPublishMapTiles({
+    previousComplaint: null,
+    nextComplaint: complaint,
+    complaintId,
+    action: "created",
+  });
+
+  logger.info(
+    {
+      event: "complaints.created",
+      complaintId,
+      actorUserId: authenticatedUserId,
+      status: complaint.status,
+    },
+    "Denúncia criada",
+  );
+
   return {
     ...complaint,
     id: complaintId,
   };
 };
 
-export const getAll = async () => {
-  const complaints = await complaintRepository.getAll();
-  return await usersService.enrichWithCreatedByUsernames(complaints);
+export const getAll = async ({ limit, cursor }) => {
+  return await complaintRepository.getSummaryPage({ limit, cursor });
+};
+
+export const getAdminAll = async ({ limit, cursor }) => {
+  const complaints = await complaintRepository.getAdminSummaryPage({ limit, cursor });
+  return {
+    ...complaints,
+    items: await usersService.enrichWithCreatedByUsernames(complaints.items),
+  };
 };
 
 export const getDetail = async (id) => {
+  const currentComplaint = await complaintRepository.getDetail(id);
+  if (currentComplaint.publicVisibility !== COMPLAINT_PUBLIC_VISIBILITY.VISIBLE) {
+    throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+  }
+
   const complaint = await openValidationByOwnerInactivityIfNeeded(id);
+  if (complaint.publicVisibility !== COMPLAINT_PUBLIC_VISIBILITY.VISIBLE) {
+    throw new NotFoundError(ERROR_CODES.COMPLAINT_NOT_FOUND);
+  }
+  return await usersService.enrichWithCreatedByUsername(complaint);
+};
+
+export const getAdminDetail = async (id) => {
+  const complaint = await complaintRepository.getDetail(id);
   return await usersService.enrichWithCreatedByUsername(complaint);
 };
 
@@ -79,6 +184,13 @@ export const patch = async (id, body, authenticatedUserId) => {
 
   const updated = await complaintRepository.patch(id, updatedData);
 
+  await syncAndPublishMapTiles({
+    previousComplaint: complaint,
+    nextComplaint: updated,
+    complaintId: id,
+    action: "updated",
+  });
+
   await notificationsService.notifyComplaintFollowers({
     complaintId: id,
     actorUserId: authenticatedUserId,
@@ -86,6 +198,15 @@ export const patch = async (id, body, authenticatedUserId) => {
     message: "Uma denúncia que você acompanha foi atualizada.",
     sendPush: true,
   });
+  logger.info(
+    {
+      event: "complaints.updated",
+      complaintId: id,
+      actorUserId: authenticatedUserId,
+      status: updated.status,
+    },
+    "Denúncia atualizada",
+  );
   return await usersService.enrichWithCreatedByUsername(updated);
 };
 
@@ -108,6 +229,13 @@ export const updateStatus = async (complaintId, newStatus, authenticatedUserId) 
 
   const updated = await complaintRepository.setStatus(complaintId, newStatus);
 
+  await syncAndPublishMapTiles({
+    previousComplaint: complaint,
+    nextComplaint: updated,
+    complaintId,
+    action: "status_updated",
+  });
+
   await notificationsService.notifyComplaintFollowers({
     complaintId,
     actorUserId: authenticatedUserId,
@@ -116,19 +244,53 @@ export const updateStatus = async (complaintId, newStatus, authenticatedUserId) 
     sendPush: false,
   });
 
+  logger.info(
+    {
+      event: "complaints.status_updated",
+      complaintId,
+      actorUserId: authenticatedUserId,
+      previousStatus: currentStatus,
+      nextStatus: newStatus,
+    },
+    "Status da denúncia atualizado",
+  );
+
   return await usersService.enrichWithCreatedByUsername(updated);
 };
 
 export const deleteComplaint = async (id, authenticatedUserId) => {
   const complaint = await complaintRepository.getDetail(id);
+  const authenticatedUserRole = await usersService.getRoleById(authenticatedUserId);
+  const canDeleteComplaint =
+    complaint.createdById === authenticatedUserId ||
+    authenticatedUserRole === USER_ROLES.ADMIN;
 
-  if (complaint.createdById !== authenticatedUserId) {
-    throw new ForbiddenError("Apenas o criador pode excluir esta denuncia");
+  if (!canDeleteComplaint) {
+    throw new ForbiddenError("Apenas o criador ou um admin pode excluir esta denuncia");
   }
 
-  deleteFiles(complaint.photos);
+  await deleteFiles(complaint.photos);
 
   await complaintRepository.deleteComplaint(id);
+  await syncAndPublishMapTiles({
+    previousComplaint: complaint,
+    nextComplaint: null,
+    complaintId: id,
+    action: "deleted",
+  });
+
+  await notificationsService.clearByComplaintId(id);
+
+  logger.info(
+    {
+      event: "complaints.deleted",
+      complaintId: id,
+      actorUserId: authenticatedUserId,
+      previousStatus: complaint.status,
+    },
+    "Denúncia excluída",
+  );
+
   return { message: "Denuncia excluida com sucesso" };
 };
 
@@ -139,6 +301,37 @@ export const findNearestWithinRadius = async ({ lat, lng, radiusKm }) => {
     radiusKm,
   );
   return await usersService.enrichWithCreatedByUsernames(complaints);
+};
+
+export const findWithinBounds = async (bounds) => {
+  const complaints = await complaintRepository.findWithinBounds(bounds);
+  return await usersService.enrichWithCreatedByUsernames(complaints);
+};
+
+export const findWithinTile = async (tile) => {
+  const complaints = await complaintRepository.findWithinBounds(getTileBounds(tile));
+  return await usersService.enrichWithCreatedByUsernames(complaints);
+};
+
+export const findWithinTiles = async ({ tiles, limit }) => {
+  return await Promise.all(
+    tiles.map(async (tile) => {
+      const complaints = await complaintRepository.findWithinBounds({
+        ...getTileBounds(tile),
+        limit,
+      });
+
+      return {
+        tileKey: `${tile.z}:${tile.x}:${tile.y}`,
+        tile,
+        items: await usersService.enrichWithCreatedByUsernames(complaints),
+      };
+    }),
+  );
+};
+
+export const getMapTilesIndex = async (query) => {
+  return await mapTilesService.getTilesIndex(query);
 };
 
 const notifyValidationRequestRecipients = async ({
@@ -203,6 +396,15 @@ const openValidationByOwnerInactivityIfNeeded = async (complaintId) => {
       complaintId,
       actorUserId: null,
     });
+
+    logger.info(
+      {
+        event: "complaints.validation.auto_opened",
+        complaintId,
+        reasonType: OWNER_INACTIVE_REASON_TYPE,
+      },
+      "Validação aberta por inatividade do autor",
+    );
   }
 
   return result.complaint;
@@ -258,16 +460,34 @@ export const requestValidation = async (
     evidenceIds: reasonType === "evidence_selection" ? evidenceIds : null,
   });
 
+  await syncAndPublishMapTiles({
+    previousComplaint: complaint,
+    nextComplaint: updated,
+    complaintId,
+    action: "validation_requested",
+  });
+
   await notifyValidationRequestRecipients({
     complaint,
     complaintId,
     actorUserId: authenticatedUserId,
   });
 
+  logger.info(
+    {
+      event: "complaints.validation.requested",
+      complaintId,
+      actorUserId: authenticatedUserId,
+      reasonType,
+      evidenceCount: evidenceIds?.length ?? 0,
+    },
+    "Validação de denúncia solicitada",
+  );
+
   return await usersService.enrichWithCreatedByUsername(updated);
 };
 
-export const getFollowedByUsername = async (username) => {
+export const getFollowedByUsername = async (username, { viewerUserId } = {}) => {
   const userId = await usersService.getUidByUsername(username);
 
   if (!userId) {
@@ -278,7 +498,31 @@ export const getFollowedByUsername = async (username) => {
 
   if (complaintIds.length === 0) return [];
 
-  return await complaintRepository.getByIds(complaintIds);
+  const complaints = await complaintRepository.getByIds(complaintIds);
+  return complaints.filter((complaint) =>
+    isVisibleInUserProfile(complaint, userId, viewerUserId),
+  );
+};
+
+export const getFollowedSummaryByUsername = async (username, { viewerUserId } = {}) => {
+  const userId = await usersService.getUidByUsername(username);
+
+  if (!userId) {
+    throw new NotFoundError();
+  }
+
+  const complaintIds = await complaintFollowersRepository.getComplaintIdsByUserId(userId);
+  const complaints = await complaintRepository.getByIds(complaintIds);
+  const visibleComplaints = complaints.filter((complaint) =>
+    isVisibleInUserProfile(complaint, userId, viewerUserId),
+  );
+
+  return {
+    total: visibleComplaints.length,
+    resolved: visibleComplaints.filter(
+      (complaint) => complaint.status === COMPLAINT_STATUS.RESOLVED,
+    ).length,
+  };
 };
 
 const MIN_VALIDATIONS_TO_CONFIRM_RESOLUTION = 3;
@@ -310,6 +554,13 @@ export const confirmResolution = async (complaintId, authenticatedUserId) => {
 
   const updated = await complaintRepository.confirmResolution(complaintId);
 
+  await syncAndPublishMapTiles({
+    previousComplaint: complaint,
+    nextComplaint: updated,
+    complaintId,
+    action: "resolved",
+  });
+
   await notificationsService.notifyComplaintFollowers({
     complaintId,
     actorUserId: authenticatedUserId,
@@ -317,6 +568,16 @@ export const confirmResolution = async (complaintId, authenticatedUserId) => {
     message: `A denúncia "${complaint.title}" foi marcada como resolvida pelo autor.`,
     sendPush: false,
   });
+
+  logger.info(
+    {
+      event: "complaints.resolved",
+      complaintId,
+      actorUserId: authenticatedUserId,
+      validationCount: count,
+    },
+    "Denúncia marcada como resolvida",
+  );
 
   return await usersService.enrichWithCreatedByUsername(updated);
 };

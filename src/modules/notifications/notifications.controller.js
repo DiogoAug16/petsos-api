@@ -27,6 +27,12 @@ export const markAsRead = async (req, res) => {
   return success(res, notification, StatusCodes.OK);
 };
 
+export const clearUserNotifications = async (req, res) => {
+  const result = await notificationsService.clearUserNotifications(req.userId);
+
+  return success(res, result, StatusCodes.OK);
+};
+
 /**
  * Controller responsável por registrar
  * o push token do usuário.
